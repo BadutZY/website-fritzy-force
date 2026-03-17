@@ -12,7 +12,7 @@ serve(async (req) => {
 
   try {
     // Accept username from request body, default to jkt48_erine
-    let username = 'jkt48-official';
+    let username = 'jkt48_fritzy';
     try {
       const body = await req.json();
       if (body?.username) {

@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    let roomUrlKey = 'JKT48_Erine';
+    let roomUrlKey = 'JKT48_Fritzy';
     try {
       const body = await req.json();
       if (body?.room_url_key) {

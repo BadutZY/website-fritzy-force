@@ -1,0 +1,375 @@
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Prata&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 270 30% 6%;
+    --foreground: 270 20% 95%;
+
+    --card: 270 25% 12%;
+    --card-foreground: 270 20% 95%;
+
+    --popover: 270 25% 12%;
+    --popover-foreground: 270 20% 95%;
+
+    --primary: 270 60% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 280 40% 20%;
+    --secondary-foreground: 270 20% 95%;
+
+    --muted: 270 20% 15%;
+    --muted-foreground: 270 15% 60%;
+
+    --accent: 280 50% 40%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 270 20% 20%;
+    --input: 270 20% 20%;
+    --ring: 270 60% 55%;
+
+    --radius: 0.5rem;
+
+    --purple-light: 270 80% 75%;
+    --purple-mid: 270 60% 55%;
+    --purple-dark: 275 50% 35%;
+    --purple-deeper: 280 45% 20%;
+    --gold: 45 80% 60%;
+    --gold-dark: 40 70% 40%;
+
+    --sidebar-background: 270 25% 10%;
+    --sidebar-foreground: 270 20% 90%;
+    --sidebar-primary: 270 60% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 280 40% 25%;
+    --sidebar-accent-foreground: 270 20% 95%;
+    --sidebar-border: 270 20% 18%;
+    --sidebar-ring: 270 60% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'EB Garamond', serif;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Cinzel', serif;
+  }
+
+  ::selection {
+    background: hsl(270, 60%, 55%);
+    color: hsl(0, 0%, 100%);
+  }
+
+  ::-moz-selection {
+    background: hsl(270, 60%, 55%);
+    color: hsl(0, 0%, 100%);
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(270, 30%, 6%);
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, hsl(270, 60%, 55%), hsl(280, 50%, 35%));
+  border-radius: 4px;
+}
+
+/* Gradient utilities */
+.gradient-purple {
+  background: linear-gradient(135deg, hsl(270, 60%, 55%), hsl(280, 50%, 35%), hsl(260, 70%, 45%));
+}
+
+.gradient-purple-dark {
+  background: linear-gradient(135deg, hsl(270, 30%, 10%), hsl(280, 35%, 15%), hsl(270, 25%, 8%));
+}
+
+.gradient-purple-text {
+  background: linear-gradient(135deg, hsl(270, 80%, 75%), hsl(280, 70%, 65%), hsl(260, 90%, 80%));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-gold-text {
+  background: linear-gradient(135deg, hsl(45, 80%, 60%), hsl(40, 70%, 50%), hsl(50, 90%, 70%));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-border {
+  border-image: linear-gradient(135deg, hsl(270, 60%, 55%), hsl(45, 80%, 60%)) 1;
+}
+
+/* Arch shape clip */
+.arch-clip {
+  clip-path: ellipse(50% 100% at 50% 100%);
+}
+
+/* Typewriter cursor */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.typewriter-cursor {
+  animation: blink 1s step-end infinite;
+}
+
+/* Checkmate animation */
+@keyframes checkmate-glow {
+  0%, 100% { 
+    text-shadow: 0 0 10px hsl(270, 80%, 75%), 0 0 20px hsl(270, 60%, 55%);
+    color: hsl(270, 80%, 75%);
+  }
+  50% { 
+    text-shadow: 0 0 20px hsl(280, 70%, 65%), 0 0 40px hsl(270, 60%, 55%);
+    color: hsl(280, 90%, 85%);
+  }
+}
+
+.checkmate-anim {
+  animation: checkmate-glow 2s ease-in-out infinite;
+}
+
+/* Castle skyline */
+.castle-skyline {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 120px;
+  background: 
+    linear-gradient(to top, hsl(270, 30%, 6%) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Calendar styles */
+.calendar-grid {
+  border-collapse: collapse;
+}
+
+.calendar-grid th,
+.calendar-grid td {
+  border: 1px solid hsl(270, 20%, 18%);
+  padding: 8px;
+  text-align: center;
+  min-width: 100px;
+  min-height: 80px;
+  vertical-align: top;
+}
+
+.calendar-grid th {
+  background: hsl(270, 25%, 15%);
+  color: hsl(270, 80%, 75%);
+  font-weight: 600;
+}
+
+.calendar-grid td {
+  background: hsl(270, 25%, 10%);
+  transition: background 0.2s;
+}
+
+.calendar-grid td:hover {
+  background: hsl(270, 25%, 14%);
+}
+
+.calendar-grid td.today {
+  background: hsl(270, 40%, 18%);
+  box-shadow: inset 0 0 0 2px hsl(270, 60%, 55%);
+}
+
+.calendar-grid td.other-month {
+  opacity: 0.4;
+}
+
+/* Gallery hover effect */
+.gallery-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.gallery-item img {
+  transition: transform 0.5s ease;
+}
+
+.gallery-item:hover img {
+  transform: scale(1.05);
+}
+
+.gallery-item .gallery-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, hsla(270, 50%, 10%, 0.9) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 16px;
+}
+
+.gallery-item:hover .gallery-overlay {
+  opacity: 1;
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ===== Org Chart CSS Tree ===== */
+.org-chart {
+  display: flex;
+  justify-content: center;
+  padding: 20px 40px 60px;
+  min-width: 1200px;
+}
+
+.org-chart ul {
+  display: flex;
+  justify-content: center;
+  padding-top: 20px;
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+}
+
+/* Vertical line from parent down to children's horizontal bar */
+.org-chart li > ul::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 20px;
+  border-left: 1px solid hsl(270, 20%, 30%);
+}
+
+/* When a li has multiple ul children, connect them all with vertical lines */
+.org-chart li > ul:not(:first-of-type)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 20px;
+  border-left: 1px solid hsl(270, 20%, 30%);
+}
+
+/* Vertical connector between consecutive ul blocks under same parent */
+.org-chart li > ul + ul {
+  margin-top: 0;
+}
+
+.org-chart li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  padding: 20px 6px 0;
+}
+
+/* Horizontal connector line between siblings */
+.org-chart li::before,
+.org-chart li::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 20px;
+  border-top: 1px solid hsl(270, 20%, 30%);
+}
+
+.org-chart li::before {
+  right: 50%;
+}
+
+.org-chart li::after {
+  left: 50%;
+}
+
+/* First child: no left bar, round the corner */
+.org-chart li:first-child::before {
+  border: none;
+}
+
+.org-chart li:first-child::after {
+  border-left: 1px solid hsl(270, 20%, 30%);
+  border-radius: 4px 0 0 0;
+}
+
+/* Last child: no right bar, round the corner */
+.org-chart li:last-child::after {
+  border: none;
+}
+
+.org-chart li:last-child::before {
+  border-right: 1px solid hsl(270, 20%, 30%);
+  border-radius: 0 4px 0 0;
+}
+
+/* Only child: just vertical, no horizontal */
+.org-chart li:only-child::before,
+.org-chart li:only-child::after {
+  border: none;
+}
+
+.org-chart li:only-child {
+  padding-top: 20px;
+}
+
+/* Root level - no connectors */
+.org-chart > ul::before {
+  display: none;
+}
+
+.org-chart > ul > li::before,
+.org-chart > ul > li::after {
+  border: none;
+}
+
+.org-chart > ul > li {
+  padding-top: 0;
+}
+
+/* Org node styling */
+.org-node {
+  transition: all 0.2s ease;
+}
+
+.org-node:hover {
+  border-color: hsl(270, 60%, 55%);
+  box-shadow: 0 0 15px hsla(270, 60%, 55%, 0.2);
+}

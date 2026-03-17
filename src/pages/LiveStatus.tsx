@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import fritzyProfile from "@/assets/timeline/joined-jkt48.jpg"
 
-const IDN_USERNAME = "jkt48_fritzy";
+const IDN_USERNAME = "lov_ftdhv4";
 const SHOWROOM_KEY = "JKT48_Fritzy";
 const DISPLAY_NAME = "Fritzy Rosmerian";
 const FOLLOWERS = "181.8K";

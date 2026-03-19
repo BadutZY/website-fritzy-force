@@ -41,9 +41,6 @@ const VideoCallSchedulePage = () => {
         </motion.div>
       </div>
 
-      {/* =============================
-         Jika Jadwal Tidak Aktif
-      ============================== */}
       {!ENABLE_SCHEDULE ? (
         <div className="max-w-4xl mx-auto px-4 mt-10">
           <motion.div
@@ -57,9 +54,7 @@ const VideoCallSchedulePage = () => {
           </motion.div>
         </div>
       ) : (
-        /* =============================
-           Jika Jadwal Aktif
-        ============================== */
+
         <div className="max-w-6xl mx-auto px-4 mt-6 pb-16">
           <div className="flex flex-col lg:flex-row gap-8">
 

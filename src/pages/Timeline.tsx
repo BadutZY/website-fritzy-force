@@ -41,7 +41,6 @@ const timeline: TimelineItem[] = [
   { date: "July 25, 2025", title: "JKT48 Special Concert FULL HOUSE", desc: "Participated in JKT48 Special Concert FULL HOUSE at Istora Senayan", image: fullHouseConcert },
 ];
 
-// ─── useScrollLock hook ───────────────────────────────────────────────────────
 const useScrollLock = (isLocked: boolean) => {
   const scrollYRef = useRef<number>(0);
 
@@ -69,7 +68,6 @@ const useScrollLock = (isLocked: boolean) => {
     }
   }, [isLocked]);
 };
-// ─────────────────────────────────────────────────────────────────────────────
 
 const TimelinePage = () => {
   const [selectedItem, setSelectedItem] = useState<TimelineItem | null>(null);
@@ -106,7 +104,6 @@ const TimelinePage = () => {
       <section className="pb-20">
         <div className="container mx-auto px-6 lg:px-16 max-w-5xl">
           <div className="relative">
-            {/* Vertical line */}
             <div className="absolute left-4 md:left-1/2 md:-translate-x-px w-0.5 h-full bg-primary/30" />
 
             {timeline.map((item, i) => (
@@ -150,7 +147,6 @@ const TimelinePage = () => {
                   </div>
                 </div>
 
-                {/* Dot on timeline */}
                 <div className="absolute left-4 md:left-1/2 -translate-x-1/2 top-4 w-3.5 h-3.5 rounded-full gradient-purple border-[3px] border-background shadow-md shadow-primary/30 z-10" />
               </motion.div>
             ))}

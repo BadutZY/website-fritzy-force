@@ -6,7 +6,7 @@ import fritzyProfile from "@/assets/timeline/joined-jkt48.jpg";
 const IDN_USERNAME = "jkt48_fritzy";
 const SHOWROOM_KEY = "JKT48_Fritzy";
 const DISPLAY_NAME = "Fritzy Rosmerian";
-const FOLLOWERS = "181.8K";
+const FOLLOWERS = "182.1K";
 const FOLLOWING = "0";
 
 type PlatformStatus = {
@@ -18,7 +18,6 @@ type PlatformStatus = {
   slug: string | null;
 };
 
-// ─── HLS Video Player Modal ───────────────────────────────────────────────────
 const HlsPlayer = ({
   streamUrl,
   liveRoomUrl,

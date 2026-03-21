@@ -15,20 +15,6 @@ const BIRTHDAY_ITEMS = [
       "https://www.tokopedia.com/jkt48-official-store/pre-order-jkt48-birthday-t-shirt-fritzy-rosmerian-2025-1731846958635320439",
     tags: ["Official", "Pre-Order", "2025"],
   },
-  // {
-  //   id: 2,
-  //   image: bdayShirt2,
-  //   badge: "New",
-  //   badgeColor: "pink" as const,
-  //   title: "...",
-  //   subtitle: "...",
-  //   description: "...",
-  //   price: "...",
-  //   note: null,
-  //   shopUrl: "...",
-  //   tags: ["Official", "2025"],
-  //   highlights: ["JKT48 Official Store", "Birthday Series"],
-  // },
 ];
 
 const BADGE_STYLES: Record<string, string> = {

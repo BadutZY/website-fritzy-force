@@ -12,22 +12,17 @@ const FETCH_HEADERS = {
   'Referer': 'https://www.idn.app/',
 };
 
-// Ekstrak stream_url / .m3u8 dari HTML
 function extractStreamUrl(html: string): string | null {
   const patterns = [
-    // JSON field langsung
     /"stream_url"\s*:\s*"(https?:\/\/[^"]+\.m3u8[^"]*)"/i,
     /"playback_url"\s*:\s*"(https?:\/\/[^"]+\.m3u8[^"]*)"/i,
     /"hls_url"\s*:\s*"(https?:\/\/[^"]+\.m3u8[^"]*)"/i,
     /"src"\s*:\s*"(https?:\/\/[^"]+\.m3u8[^"]*)"/i,
     /"url"\s*:\s*"(https?:\/\/[^"]+\.m3u8[^"]*)"/i,
-    // JSON dengan escaped slash
     /"stream_url"\s*:\s*"(https?:\\\/\\\/[^"]+\.m3u8[^"]*)"/i,
     /"playback_url"\s*:\s*"(https?:\\\/\\\/[^"]+\.m3u8[^"]*)"/i,
-    // Next.js / Nuxt __NEXT_DATA__ / __NUXT__ JSON blob
     /"streamUrl"\s*:\s*"(https?:\/\/[^"]+\.m3u8[^"]*)"/i,
     /"streamURL"\s*:\s*"(https?:\/\/[^"]+\.m3u8[^"]*)"/i,
-    // m3u8 URL di mana saja dalam HTML
     /(https?:\/\/[a-zA-Z0-9.\-_\/]+\.m3u8(?:\?[^"'\s<>]*)?)/i,
   ];
 
@@ -35,7 +30,6 @@ function extractStreamUrl(html: string): string | null {
     const m = html.match(p);
     if (m) {
       const url = m[1].replace(/\\\//g, '/');
-      // Validasi: harus berupa URL yang valid
       if (url.startsWith('http') && url.includes('.m3u8')) {
         return url;
       }
@@ -44,9 +38,7 @@ function extractStreamUrl(html: string): string | null {
   return null;
 }
 
-// Ekstrak semua JSON objects dari <script> tags dan cari stream URL
 function extractStreamFromScriptTags(html: string): string | null {
-  // Ambil semua content <script> tag
   const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
   let match;
   while ((match = scriptRegex.exec(html)) !== null) {
@@ -82,16 +74,13 @@ serve(async (req) => {
 
     const res = await fetch(liveRoomUrl, { headers: FETCH_HEADERS });
     const html = await res.text();
-
-    // Coba 1: ekstrak dari seluruh HTML
+    
     let streamUrl = extractStreamUrl(html);
 
-    // Coba 2: ekstrak dari dalam <script> tags saja
     if (!streamUrl) {
       streamUrl = extractStreamFromScriptTags(html);
     }
 
-    // Coba 3: Cari __NEXT_DATA__ JSON (Next.js)
     if (!streamUrl) {
       const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
       if (nextDataMatch) {

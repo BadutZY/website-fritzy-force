@@ -24,7 +24,6 @@ serve(async (req) => {
       if (body?.room_url_key) roomUrlKey = body.room_url_key;
     } catch { /* pakai default */ }
 
-    // ── LANGKAH 1: Cek status room + dapat room_id ──────────────────────────
     const statusRes = await fetch(
       `${SHOWROOM_API}/room/status?room_url_key=${encodeURIComponent(roomUrlKey)}`,
       { headers: FETCH_HEADERS }
@@ -34,7 +33,6 @@ serve(async (req) => {
     const isLive = statusData?.is_live === true || statusData?.live_status === 2;
     const roomId: number | null = statusData?.room_id ?? null;
 
-    // ── LANGKAH 2: Jika live, ambil streaming URL via API resmi Showroom ────
     let streamUrl: string | null = null;
     let streamUrlLow: string | null = null;
 
@@ -45,21 +43,16 @@ serve(async (req) => {
           { headers: FETCH_HEADERS }
         );
         const streamData = await streamRes.json();
-
-        // Response: { streaming_url_list: [{ url, type, quality, label, is_default }] }
         const urlList: any[] = streamData?.streaming_url_list ?? [];
-
-        // Ambil HLS stream (type: "hls"), pilih kualitas tertinggi (quality terbesar)
         const hlsStreams = urlList
           .filter((s: any) => s?.type === 'hls' && s?.url)
           .sort((a: any, b: any) => (b?.quality ?? 0) - (a?.quality ?? 0));
 
         if (hlsStreams.length > 0) {
-          streamUrl = hlsStreams[0].url;                        // kualitas tertinggi
-          streamUrlLow = hlsStreams[hlsStreams.length - 1].url; // kualitas terendah
+          streamUrl = hlsStreams[0].url;
+          streamUrlLow = hlsStreams[hlsStreams.length - 1].url;
         }
 
-        // Fallback: ambil stream pertama apapun jika HLS kosong
         if (!streamUrl) {
           const allStreams = urlList.filter((s: any) => s?.url);
           if (allStreams.length > 0) streamUrl = allStreams[0].url;
@@ -79,8 +72,8 @@ serve(async (req) => {
         room_name: statusData?.room_name ?? null,
         started_at: statusData?.started_at ?? null,
         image: statusData?.image_s ?? null,
-        stream_url: streamUrl,         // HLS .m3u8 kualitas tinggi → untuk player
-        stream_url_low: streamUrlLow,  // HLS .m3u8 kualitas rendah → fallback
+        stream_url: streamUrl,
+        stream_url_low: streamUrlLow,
         checked_at: new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

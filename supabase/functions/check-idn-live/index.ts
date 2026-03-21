@@ -14,7 +14,6 @@ const FETCH_HEADERS = {
   'Accept-Language': 'id-ID,id;q=0.9,en;q=0.8',
 };
 
-// Ekstrak slug dari HTML
 function extractSlugFromHtml(html: string, username: string): string | null {
   const patterns = [
     new RegExp(`/${username}/live/([\\w-]+)`, 'i'),
@@ -28,31 +27,25 @@ function extractSlugFromHtml(html: string, username: string): string | null {
   return null;
 }
 
-// Ekstrak stream_url (.m3u8) dari HTML halaman live room
 function extractStreamUrlFromHtml(html: string): string | null {
-  // Pola 1: "stream_url":"https://...m3u8..."
   const patterns = [
     /"stream_url"\s*:\s*"(https?:\/\/[^"]+\.m3u8[^"]*)"/i,
     /"playback_url"\s*:\s*"(https?:\/\/[^"]+\.m3u8[^"]*)"/i,
     /"hls_url"\s*:\s*"(https?:\/\/[^"]+\.m3u8[^"]*)"/i,
     /"url"\s*:\s*"(https?:\/\/[^"]+\.m3u8[^"]*)"/i,
-    // Pola dengan escape: "stream_url":"https:\/\/...m3u8"
     /"stream_url"\s*:\s*"(https?:\\\/\\\/[^"]+\.m3u8[^"]*)"/i,
     /"playback_url"\s*:\s*"(https?:\\\/\\\/[^"]+\.m3u8[^"]*)"/i,
-    // URL m3u8 langsung tanpa key tertentu
     /(https?:\/\/[a-zA-Z0-9._\-\/]+\.m3u8(?:\?[^"'\s]*)?)/i,
   ];
   for (const p of patterns) {
     const m = html.match(p);
     if (m) {
-      // Unescape backslash jika perlu
       return m[1].replace(/\\\//g, '/');
     }
   }
   return null;
 }
 
-// Ambil slug dari JKT48Connect API
 async function getLiveDataFromJkt48Connect(username: string): Promise<{ slug: string | null; stream_url: string | null }> {
   try {
     const res = await fetch(
@@ -78,7 +71,6 @@ async function getLiveDataFromJkt48Connect(username: string): Promise<{ slug: st
 
     if (!entry) return { slug: null, stream_url: null };
 
-    // Coba ambil stream_url langsung dari response JKT48Connect
     let stream_url: string | null = null;
     for (const f of ['stream_url', 'playback_url', 'hls_url', 'live_url']) {
       const v = entry?.[f] ?? entry?.user?.[f] ?? entry?.stream?.[f];
@@ -88,7 +80,6 @@ async function getLiveDataFromJkt48Connect(username: string): Promise<{ slug: st
       }
     }
 
-    // Ambil slug
     let slug: string | null = null;
     for (const f of ['slug', 'live_slug', 'stream_key', 'live_id']) {
       if (entry[f]) {
@@ -105,7 +96,6 @@ async function getLiveDataFromJkt48Connect(username: string): Promise<{ slug: st
   }
 }
 
-// Scrape halaman live room untuk mendapatkan stream_url
 async function scrapeStreamUrlFromLiveRoom(username: string, slug: string): Promise<string | null> {
   try {
     const liveRoomUrl = `https://www.idn.app/${username}/live/${slug}`;
@@ -130,7 +120,6 @@ serve(async (req) => {
       if (body?.username) username = body.username;
     } catch { /* pakai default */ }
 
-    // ── LANGKAH 1: Scraping profil IDN (deteksi live) ──────────────────────
     const profileUrl = `https://www.idn.app/${username}`;
     let profileHtml = '';
     let isLiveFromProfile = false;
@@ -152,7 +141,6 @@ serve(async (req) => {
       console.error('[Profile scrape] Error:', e);
     }
 
-    // ── LANGKAH 2: Scraping homepage IDN (deteksi live) ────────────────────
     let isLiveFromHomepage = false;
     let homepageHtml = '';
 
@@ -169,27 +157,22 @@ serve(async (req) => {
 
     const finalIsLive = isLiveFromProfile || isLiveFromHomepage;
 
-    // ── LANGKAH 3: Jika live, cari slug + stream_url ───────────────────────
     let liveUrl: string | null = null;
     let streamUrl: string | null = null;
 
     if (finalIsLive) {
-      // Cari slug dari HTML dulu
       let slug = extractSlugFromHtml(profileHtml, username)
         ?? extractSlugFromHtml(homepageHtml, username);
 
-      // Cek apakah stream_url ada langsung di HTML profil
       streamUrl = extractStreamUrlFromHtml(profileHtml)
         ?? extractStreamUrlFromHtml(homepageHtml);
 
-      // Fallback: tanya JKT48Connect
       if (!slug || !streamUrl) {
         const jkt48Data = await getLiveDataFromJkt48Connect(username);
         if (!slug) slug = jkt48Data.slug;
         if (!streamUrl) streamUrl = jkt48Data.stream_url;
       }
 
-      // Jika sudah ada slug tapi belum ada stream_url, scrape halaman live room
       if (slug && !streamUrl) {
         streamUrl = await scrapeStreamUrlFromLiveRoom(username, slug);
       }
@@ -204,7 +187,7 @@ serve(async (req) => {
         is_live: finalIsLive,
         username,
         live_url: liveUrl,
-        stream_url: streamUrl,  // <-- URL .m3u8 untuk HLS player
+        stream_url: streamUrl,
         checked_at: new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

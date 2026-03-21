@@ -41,7 +41,6 @@ const HlsPlayer = ({
     if (!video) return;
     setPlayerState("loading");
 
-    // Safari / iOS: support HLS native
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = url;
       video.play().catch(() => {});
@@ -171,7 +170,6 @@ const HlsPlayer = ({
   );
 };
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
 const LiveStatusPage = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [idn, setIdn] = useState<PlatformStatus>({
@@ -181,7 +179,6 @@ const LiveStatusPage = () => {
     isLive: false, isChecking: true, lastChecked: null, liveUrl: null, streamUrl: null, slug: null,
   });
 
-  // Player state
   const [activePlayer, setActivePlayer] = useState<null | "idn" | "showroom">(null);
   const [activeStreamUrl, setActiveStreamUrl] = useState<string | null>(null);
   const [isLoadingStream, setIsLoadingStream] = useState<"idn" | "showroom" | null>(null);
@@ -191,7 +188,6 @@ const LiveStatusPage = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // ── Check IDN status ────────────────────────────────────────────────────────
   const checkIdnStatus = useCallback(async () => {
     setIdn(prev => ({ ...prev, isChecking: true }));
     try {
@@ -214,7 +210,6 @@ const LiveStatusPage = () => {
     }
   }, []);
 
-  // ── Check Showroom status ───────────────────────────────────────────────────
   const checkShowroomStatus = useCallback(async () => {
     setShowroom(prev => ({ ...prev, isChecking: true }));
     try {
@@ -227,7 +222,7 @@ const LiveStatusPage = () => {
         isChecking: false,
         lastChecked: data?.checked_at ?? new Date().toISOString(),
         liveUrl: `https://www.showroom-live.com/r/${SHOWROOM_KEY}`,
-        streamUrl: data?.stream_url ?? null,  // <-- langsung dari API Showroom
+        streamUrl: data?.stream_url ?? null,
         slug: null,
       });
     } catch (err) {
@@ -241,7 +236,6 @@ const LiveStatusPage = () => {
     checkShowroomStatus();
   }, [checkIdnStatus, checkShowroomStatus]);
 
-  // ── Buka IDN Player ─────────────────────────────────────────────────────────
   const handleWatchIDN = useCallback(async () => {
     if (idn.streamUrl) {
       setActiveStreamUrl(idn.streamUrl);
@@ -270,7 +264,6 @@ const LiveStatusPage = () => {
     window.open(idn.liveUrl ?? `https://www.idn.app/${IDN_USERNAME}`, '_blank');
   }, [idn]);
 
-  // Refresh IDN stream (dipanggil dari HlsPlayer saat error)
   const handleRefreshIDN = useCallback(async (): Promise<string | null> => {
     if (!idn.slug) return null;
     try {
@@ -281,14 +274,12 @@ const LiveStatusPage = () => {
     } catch { return null; }
   }, [idn.slug]);
 
-  // ── Buka Showroom Player ────────────────────────────────────────────────────
   const handleWatchShowroom = useCallback(async () => {
     if (showroom.streamUrl) {
       setActiveStreamUrl(showroom.streamUrl);
       setActivePlayer("showroom");
       return;
     }
-    // Tidak ada stream_url → re-check untuk dapat stream terbaru
     setIsLoadingStream("showroom");
     try {
       const { data, error } = await supabase.functions.invoke('check-showroom-live', {
@@ -308,7 +299,6 @@ const LiveStatusPage = () => {
     }
   }, [showroom.streamUrl]);
 
-  // Refresh Showroom stream (dipanggil dari HlsPlayer saat error)
   const handleRefreshShowroom = useCallback(async (): Promise<string | null> => {
     try {
       const { data, error } = await supabase.functions.invoke('check-showroom-live', {

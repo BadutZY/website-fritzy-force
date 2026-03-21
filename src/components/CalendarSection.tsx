@@ -17,7 +17,6 @@ const events: CalendarEvent[] = [
 
 const dayNames = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
-// ─── useScrollLock hook ───────────────────────────────────────────────────────
 const useScrollLock = (isLocked: boolean) => {
   const scrollYRef = useRef<number>(0);
 
@@ -45,7 +44,6 @@ const useScrollLock = (isLocked: boolean) => {
     }
   }, [isLocked]);
 };
-// ─────────────────────────────────────────────────────────────────────────────
 
 const CalendarSection = () => {
   const [currentMonth] = useState(new Date().getMonth());

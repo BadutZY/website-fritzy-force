@@ -1,19 +1,13 @@
 import { motion } from "framer-motion";
 import { ShoppingCart, ExternalLink, Tag, Star } from "lucide-react";
 import merchBanner from "@/assets/merchandise/merchandise-1.png";
-// Tambah gambar baru di sini:
-// import merchBanner2 from "@/assets/merchandise/merchandise-2.png";
-// import merchBanner3 from "@/assets/merchandise/merchandise-3.png";
 
-// ============================================================
-// KONFIGURASI MERCHANDISE — Tambah / hapus item di sini saja!
-// ============================================================
 const MERCHANDISE_ITEMS = [
   {
     id: 1,
     image: merchBanner,
     badge: "Best Seller",
-    badgeColor: "gold" as const,   // "gold" | "purple" | "green"
+    badgeColor: "gold" as const,
     title: "No Hesitation Bundle",
     subtitle: "Cavallery Collection",
     description:
@@ -24,36 +18,7 @@ const MERCHANDISE_ITEMS = [
     tags: ["Bundle", "Eksklusif", "Limited"],
     rating: 5,
   },
-  // {
-  //   id: 2,
-  //   image: merchBanner2,
-  //   badge: "New",
-  //   badgeColor: "purple" as const,
-  //   title: "Fritzy Hoodie",
-  //   subtitle: "Streetwear Series",
-  //   description: "Hoodie premium dengan logo Fritzy Force bordir. Nyaman dipakai sehari-hari.",
-  //   price: "Rp 249.000",
-  //   originalPrice: null,
-  //   shopUrl: "https://bit.ly/MerchFRITZYTALE17",
-  //   tags: ["Hoodie", "Premium"],
-  //   rating: 4,
-  // },
-  // {
-  //   id: 3,
-  //   image: merchBanner3,
-  //   badge: null,
-  //   badgeColor: "green" as const,
-  //   title: "Fritzy Cap",
-  //   subtitle: "Accessories Line",
-  //   description: "Topi snapback eksklusif. Cocok untuk semua aktivitas.",
-  //   price: "Rp 149.000",
-  //   originalPrice: null,
-  //   shopUrl: "https://bit.ly/MerchFRITZYTALE17",
-  //   tags: ["Topi", "Unisex"],
-  //   rating: 4,
-  // },
 ];
-// ============================================================
 
 const BADGE_STYLES: Record<string, string> = {
   gold:   "bg-amber-400/20 text-amber-300 border border-amber-400/40",
@@ -74,7 +39,6 @@ const StarRating = ({ rating }: { rating: number }) => (
   </div>
 );
 
-// ── Kartu Merchandise ─────────────────────────────────────────
 const MerchCard = ({
   item,
   index,
@@ -173,7 +137,6 @@ const MerchCard = ({
   </motion.div>
 );
 
-// ── Halaman Merchandise ───────────────────────────────────────
 const MerchandisePage = () => {
   const itemCount = MERCHANDISE_ITEMS.length;
 

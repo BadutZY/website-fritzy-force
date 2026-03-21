@@ -34,7 +34,6 @@ const galleryImages = [
   { src: shonicihAitakatta, title: "Shonichi Setlist Aitakatta" },
 ];
 
-// ─── useScrollLock hook ───────────────────────────────────────────────────────
 const useScrollLock = (isLocked: boolean) => {
   const scrollYRef = useRef<number>(0);
 
@@ -62,7 +61,6 @@ const useScrollLock = (isLocked: boolean) => {
     }
   }, [isLocked]);
 };
-// ─────────────────────────────────────────────────────────────────────────────
 
 const GalleryPage = () => {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);

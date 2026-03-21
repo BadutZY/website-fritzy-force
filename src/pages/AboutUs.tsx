@@ -131,7 +131,6 @@ const aboutStats = [
   { value: "8+", label: "Project" },
 ];
 
-// ─── useScrollLock hook ───────────────────────────────────────────────────────
 const useScrollLock = (isLocked: boolean) => {
   const scrollYRef = useRef<number>(0);
 
@@ -159,7 +158,6 @@ const useScrollLock = (isLocked: boolean) => {
     }
   }, [isLocked]);
 };
-// ─────────────────────────────────────────────────────────────────────────────
 
 const AboutUsPage = () => {
   const [filter, setFilter] = useState<string>("all");

@@ -1,14 +1,34 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/integrations/supabase/client";
-import fritzyProfile from "@/assets/timeline/joined-jkt48.jpg";
+import fritzyHero from "@/assets/hero/fritzy-main.jpg";
+import idnLogo from "@/assets/logo/idn-logo.png";
+import showroomLogo from "@/assets/logo/showroom-logo.png";
 
-const IDN_USERNAME = "jkt48_fritzy";
-const SHOWROOM_KEY = "JKT48_Fritzy";
-const DISPLAY_NAME = "Fritzy Rosmerian";
-const FOLLOWERS = "182.1K";
-const FOLLOWING = "0";
+/* ─── Constants ─────────────────────────────────────── */
+const DISPLAY_NAME_FALLBACK = "Fritzy Rosmerian";
+const IDN_USERNAME          = "jkt48_fritzy";
+const FOLLOWERS_FALLBACK    = "—";
+const FOLLOWING_FALLBACK    = "—";
 
+const SHOWROOM_KEY          = "JKT48_Fritzy";
+const SHOWROOM_ROOM_ID      = 510011;
+const SR_FOLLOWERS_FALLBACK = "—";
+const SR_LEVEL_FALLBACK     = "—";
+
+/* ─── Types ──────────────────────────────────────────── */
+type ProfileStats = {
+  display_name: string;
+  followers: string;
+  following: string;
+  isLoading: boolean;
+};
+type ShowroomProfileStats = {
+  followers: string;
+  level: string;
+  isLoading: boolean;
+};
 type PlatformStatus = {
   isLive: boolean;
   isChecking: boolean;
@@ -17,505 +37,860 @@ type PlatformStatus = {
   streamUrl: string | null;
   slug: string | null;
 };
+type UrlQuality  = { label: string; url: string };
+type HlsQuality  = { index: number; label: string; height: number };
 
+/* ─── Scroll Lock ────────────────────────────────────── */
+function useScrollLock(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const html = document.documentElement;
+    const prevOverflow = html.style.overflow;
+    const prevHeight   = html.style.height;
+    html.style.overflow = "hidden";
+    html.style.height   = "100%";
+    return () => {
+      html.style.overflow = prevOverflow;
+      html.style.height   = prevHeight;
+    };
+  }, [active]);
+}
+
+/* ─── SVG Icons ──────────────────────────────────────── */
+const IconVolume  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>;
+const IconMute    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>;
+const IconExpand  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>;
+const IconShrink  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>;
+const IconPiP     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect x="2" y="2" width="20" height="20" rx="2"/><rect x="12" y="13" width="8" height="6" rx="1" fill="currentColor" stroke="none"/></svg>;
+const IconRefresh = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>;
+const IconTheater = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="12" x2="22" y2="12" strokeDasharray="3 2"/></svg>;
+const IconQuality = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>;
+
+/* ─── HLS Player Modal ───────────────────────────────── */
 const HlsPlayer = ({
-  streamUrl,
-  liveRoomUrl,
-  platformName,
-  onClose,
-  onRefresh,
+  isOpen, streamUrl, streamQualities, liveRoomUrl, platformName, onClose, onRefresh,
 }: {
+  isOpen: boolean;
   streamUrl: string;
+  streamQualities: UrlQuality[];
   liveRoomUrl: string;
   platformName: string;
   onClose: () => void;
   onRefresh: () => Promise<string | null>;
 }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const hlsRef = useRef<any>(null);
-  const [playerState, setPlayerState] = useState<"loading" | "playing" | "error" | "refreshing">("loading");
-  const [errorMsg, setErrorMsg] = useState("");
+  const videoRef     = useRef<HTMLVideoElement>(null);
+  const hlsRef       = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hideTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isHoveringRef = useRef(false);
+  const volTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [playerState,      setPlayerState]      = useState<"loading"|"playing"|"error"|"refreshing">("loading");
+  const [errorMsg,         setErrorMsg]          = useState("");
+  const [isMuted,          setIsMuted]           = useState(false);
+  const [volume,           setVolume]            = useState(1);
+  const [showVolume,       setShowVolume]        = useState(false);
+  const [isFullscreen,     setIsFullscreen]      = useState(false);
+  const [isTheater,        setIsTheater]         = useState(false);
+  const [showControls,     setShowControls]      = useState(true);
+  const [hlsQualities,     setHlsQualities]      = useState<HlsQuality[]>([]);
+  const [currentHlsLevel,  setCurrentHlsLevel]   = useState<number>(-1);
+  const [activeUrlQuality, setActiveUrlQuality]  = useState<string>("");
+  const [showQuality,      setShowQuality]       = useState(false);
+  const [latency,          setLatency]           = useState<number|null>(null);
+  const [isPiPActive,      setIsPiPActive]       = useState(false);
+
+  useScrollLock(isOpen);
+
+  const startHideTimer = useCallback(() => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => {
+      if (!isHoveringRef.current) setShowControls(false);
+    }, 3000);
+  }, []);
+  const cancelHideTimer = useCallback(() => {
+    if (hideTimerRef.current) { clearTimeout(hideTimerRef.current); hideTimerRef.current = null; }
+  }, []);
+  const handleVideoMouseEnter = useCallback(() => { isHoveringRef.current = true; cancelHideTimer(); setShowControls(true); }, [cancelHideTimer]);
+  const handleVideoMouseMove  = useCallback(() => { setShowControls(true); startHideTimer(); }, [startHideTimer]);
+  const handleVideoMouseLeave = useCallback(() => { isHoveringRef.current = false; startHideTimer(); }, [startHideTimer]);
+  const handleControlBarEnter = useCallback(() => { cancelHideTimer(); setShowControls(true); }, [cancelHideTimer]);
+  const handleControlBarLeave = useCallback(() => { startHideTimer(); }, [startHideTimer]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { if (showQuality) setShowQuality(false); else onClose(); }
+      if (e.key === "m" || e.key === "M") toggleMute();
+      if (e.key === "f" || e.key === "F") toggleFullscreen();
+      if (e.key === "t" || e.key === "T") setIsTheater(p => !p);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose, showQuality]);
+
+  useEffect(() => {
+    const fn = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", fn);
+    return () => document.removeEventListener("fullscreenchange", fn);
+  }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const onEnter = () => setIsPiPActive(true);
+    const onLeave = () => setIsPiPActive(false);
+    video.addEventListener("enterpictureinpicture", onEnter);
+    video.addEventListener("leavepictureinpicture", onLeave);
+    return () => { video.removeEventListener("enterpictureinpicture", onEnter); video.removeEventListener("leavepictureinpicture", onLeave); };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
+      if (videoRef.current) { videoRef.current.pause(); videoRef.current.src = ""; }
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+      setHlsQualities([]); setCurrentHlsLevel(-1); setLatency(null);
+      setIsTheater(false); setShowQuality(false); setActiveUrlQuality("");
+    }
+  }, [isOpen]);
 
   const loadStream = useCallback(async (url: string) => {
     const video = videoRef.current;
     if (!video) return;
     setPlayerState("loading");
-
+    setHlsQualities([]); setCurrentHlsLevel(-1);
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = url;
-      video.play().catch(() => {});
-      setPlayerState("playing");
-      return;
+      video.src = url; video.play().catch(() => {}); setPlayerState("playing"); return;
     }
-
     try {
       const { default: Hls } = await import("hls.js");
-
-      if (!Hls.isSupported()) {
-        setErrorMsg("Browser tidak mendukung HLS playback.");
-        setPlayerState("error");
-        return;
-      }
-
+      if (!Hls.isSupported()) { setErrorMsg("Browser tidak mendukung HLS."); setPlayerState("error"); return; }
       if (hlsRef.current) hlsRef.current.destroy();
-
       const hls = new Hls({ enableWorker: true, lowLatencyMode: true, backBufferLength: 90 });
       hlsRef.current = hls;
-
       hls.loadSource(url);
       hls.attachMedia(video);
-
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      hls.on(Hls.Events.MANIFEST_PARSED, (_: any, data: any) => {
         video.play().catch(() => {});
         setPlayerState("playing");
+        if (data.levels && data.levels.length > 1) {
+          const seen = new Set<string>();
+          const levels: HlsQuality[] = data.levels
+            .map((lvl: any, i: number) => ({ index: i, label: lvl.height ? `${lvl.height}p` : `Level ${i+1}`, height: lvl.height ?? 0 }))
+            .sort((a: HlsQuality, b: HlsQuality) => b.height - a.height)
+            .filter((l: HlsQuality) => { if (seen.has(l.label)) return false; seen.add(l.label); return true; });
+          setHlsQualities(levels); setCurrentHlsLevel(-1);
+        }
       });
-
+      hls.on(Hls.Events.FRAG_LOADED, () => {
+        try { const lat = (hls as any).latency; if (lat != null && isFinite(lat)) setLatency(Math.round(lat)); } catch { /**/ }
+      });
       hls.on(Hls.Events.ERROR, (_: any, data: any) => {
         if (data.fatal) {
-          setErrorMsg(
-            data.type === "networkError"
-              ? "Stream tidak dapat dimuat. Token mungkin sudah expire."
-              : "Terjadi kesalahan saat memutar stream."
-          );
+          setErrorMsg(data.type === "networkError" ? "Stream tidak dapat dimuat. Token mungkin sudah expire." : "Terjadi kesalahan saat memutar stream.");
           setPlayerState("error");
         }
       });
-    } catch {
-      setErrorMsg("Gagal memuat HLS player. Pastikan hls.js sudah terinstall.");
-      setPlayerState("error");
-    }
+    } catch { setErrorMsg("Gagal memuat HLS player."); setPlayerState("error"); }
   }, []);
 
   useEffect(() => {
-    loadStream(streamUrl);
+    if (isOpen && streamUrl) { setErrorMsg(""); if (streamQualities.length > 0) setActiveUrlQuality(streamUrl); loadStream(streamUrl); }
     return () => { if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; } };
-  }, [streamUrl, loadStream]);
+  }, [isOpen, streamUrl, loadStream]);
 
-  const handleRefresh = useCallback(async () => {
+  const handleRefreshStream = useCallback(async () => {
     setPlayerState("refreshing");
     const newUrl = await onRefresh();
-    if (newUrl) {
-      await loadStream(newUrl);
-    } else {
-      setErrorMsg("Gagal refresh stream. Coba buka langsung di platform.");
-      setPlayerState("error");
-    }
+    if (newUrl) { await loadStream(newUrl); }
+    else { setErrorMsg("Gagal refresh. Coba buka langsung di platform."); setPlayerState("error"); }
   }, [onRefresh, loadStream]);
 
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4"
-      >
-        {/* Header */}
-        <div className="w-full max-w-2xl flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-            <span className="text-white font-semibold text-sm">
-              Live {platformName}
-            </span>
-          </div>
-          <div className="flex gap-2">
-            <a href={liveRoomUrl} target="_blank" rel="noopener noreferrer"
-              className="text-xs text-white/60 hover:text-white border border-white/20 px-3 py-1.5 rounded-full transition-colors">
-              Buka di {platformName} ↗
-            </a>
-            <button onClick={onClose}
-              className="text-xs text-white/60 hover:text-white border border-white/20 px-3 py-1.5 rounded-full transition-colors">
-              ✕
-            </button>
-          </div>
-        </div>
+  const toggleMute = useCallback(() => {
+    const video = videoRef.current; if (!video) return;
+    video.muted = !video.muted; setIsMuted(video.muted);
+  }, []);
 
-        {/* Video */}
-        <div className="w-full max-w-2xl aspect-video bg-black rounded-xl overflow-hidden relative">
-          <video ref={videoRef} className="w-full h-full" controls autoPlay playsInline />
+  const handleVolume = useCallback((val: number) => {
+    const video = videoRef.current; if (!video) return;
+    video.volume = val; video.muted = val === 0; setVolume(val); setIsMuted(val === 0);
+  }, []);
 
-          {(playerState === "loading" || playerState === "refreshing") && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70">
-              <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
-              <p className="text-white/70 text-sm">
-                {playerState === "refreshing" ? "Refresh stream..." : "Memuat stream..."}
-              </p>
-            </div>
-          )}
+  const toggleFullscreen = useCallback(async () => {
+    const el = containerRef.current; if (!el) return;
+    if (!document.fullscreenElement) await el.requestFullscreen().catch(() => {});
+    else await document.exitFullscreen().catch(() => {});
+  }, []);
 
-          {playerState === "error" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 p-6 text-center">
-              <p className="text-red-400 font-semibold mb-2">⚠ Stream Error</p>
-              <p className="text-white/60 text-sm mb-5">{errorMsg}</p>
-              <div className="flex gap-3 flex-wrap justify-center">
-                <button onClick={handleRefresh}
-                  className="bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors">
-                  Refresh Stream
-                </button>
+  const togglePiP = useCallback(async () => {
+    const video = videoRef.current; if (!video) return;
+    if (document.pictureInPictureElement) await document.exitPictureInPicture().catch(() => {});
+    else await video.requestPictureInPicture().catch(() => {});
+  }, []);
+
+  const switchHlsLevel = useCallback((levelIndex: number) => {
+    const hls = hlsRef.current; if (!hls) return;
+    hls.currentLevel = levelIndex; setCurrentHlsLevel(levelIndex); setShowQuality(false);
+  }, []);
+
+  const switchUrlQuality = useCallback((urlQ: UrlQuality) => {
+    setActiveUrlQuality(urlQ.url); setShowQuality(false); loadStream(urlQ.url);
+  }, [loadStream]);
+
+  const hasUrlQualities   = streamQualities.length > 1;
+  const hasHlsQualities   = hlsQualities.length > 1;
+  const showQualityBtn    = hasUrlQualities || hasHlsQualities;
+  const currentQualityLabel = hasUrlQualities
+    ? (streamQualities.find(q => q.url === activeUrlQuality)?.label ?? streamQualities[0]?.label ?? "Kualitas")
+    : currentHlsLevel === -1 ? "Auto" : (hlsQualities.find(q => q.index === currentHlsLevel)?.label ?? "Auto");
+
+  const E = {
+    easeOut: [0.0, 0.0, 0.2, 1.0] as [number,number,number,number],
+    easeIn:  [0.4, 0.0, 1.0, 1.0] as [number,number,number,number],
+    tvOut:   [0.55, 0, 1, 0.45]   as [number,number,number,number],
+    spring:  { type: "spring" as const, stiffness: 240, damping: 22, mass: 0.9 },
+    springX: { type: "spring" as const, stiffness: 280, damping: 26, delay: 0.03 },
+  };
+
+  const backdropV = {
+    hidden:  { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 0.3, ease: E.easeOut } },
+    exit:    { opacity: 0, transition: { duration: 0.35, ease: E.easeIn, delay: 0.15 } },
+  };
+  const tvV = {
+    hidden:  { scaleY: 0.02, scaleX: 0.88, opacity: 1, filter: "brightness(2.5) blur(3px)" },
+    visible: { scaleY: 1, scaleX: 1, opacity: 1, filter: "brightness(1) blur(0px)", transition: { scaleY: E.spring, scaleX: E.springX, filter: { duration: 0.45, ease: E.easeOut, delay: 0.05 }, opacity: { duration: 0.01 }, staggerChildren: 0.07, delayChildren: 0.28 } },
+    exit:    { scaleY: 0.02, scaleX: 0.84, opacity: 0, filter: "brightness(4) blur(6px)", transition: { scaleY: { duration: 0.2, ease: E.tvOut }, scaleX: { duration: 0.26, ease: E.tvOut }, opacity: { duration: 0.16, ease: E.easeIn, delay: 0.15 }, filter: { duration: 0.18, ease: E.easeIn } } },
+  };
+  const childV  = { hidden: { opacity: 0, y: -8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.26, ease: E.easeOut } }, exit: { opacity: 0, y: -6, transition: { duration: 0.12 } } };
+  const videoV  = { hidden: { opacity: 0, scale: 0.97 }, visible: { opacity: 1, scale: 1, transition: { duration: 0.32, ease: E.easeOut } }, exit: { opacity: 0, scale: 0.95, transition: { duration: 0.18 } } };
+  const footerV = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: 0.4, delay: 0.12 } }, exit: { opacity: 0, transition: { duration: 0.1 } } };
+
+  const maxW = isTheater ? "max-w-5xl" : "max-w-3xl";
+
+  return createPortal(
+    <AnimatePresence mode="wait">
+      {isOpen && (
+        <motion.div
+          key="hls-overlay" variants={backdropV} initial="hidden" animate="visible" exit="exit"
+          style={{ position: "fixed", inset: 0, zIndex: 99999 }}
+          className="flex flex-col items-center justify-center p-3 md:p-4"
+          onTouchMove={(e) => e.preventDefault()}
+        >
+          <motion.div
+            className="absolute inset-0 cursor-pointer"
+            style={{ background: "rgba(5,3,12,0.96)", backdropFilter: "blur(0px)" }}
+            animate={{ backdropFilter: "blur(20px)" }}
+            exit={{ backdropFilter: "blur(0px)" }}
+            transition={{ duration: 0.45, ease: E.easeOut }}
+            onClick={onClose}
+          />
+          <motion.div
+            className="absolute pointer-events-none"
+            style={{ width: 800, height: 450, background: "radial-gradient(ellipse at center,rgba(120,60,200,0.18) 0%,transparent 70%)", filter: "blur(64px)" }}
+            initial={{ opacity: 0, scale: 0.4 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.4 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          />
+
+          <motion.div key="hls-content" variants={tvV} initial="hidden" animate="visible" exit="exit"
+            className={`relative z-10 w-full ${maxW} transition-all duration-500`}
+            style={{ transformOrigin: "center center" }}
+          >
+            {/* CRT overlay */}
+            <motion.div className="absolute inset-0 rounded-2xl pointer-events-none z-20 overflow-hidden"
+              initial={{ opacity: 1 }} animate={{ opacity: 0 }} transition={{ duration: 0.6, ease: E.easeOut, delay: 0.12 }}
+            >
+              <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(180,120,255,0.025) 3px,rgba(180,120,255,0.025) 4px)" }} />
+              <motion.div style={{ position: "absolute", left: 0, right: 0, height: 3, background: "linear-gradient(90deg,transparent 0%,hsl(270,60%,60%) 50%,transparent 100%)", boxShadow: "0 0 16px hsl(270,60%,55%)" }}
+                initial={{ top: "-2%" }} animate={{ top: "104%" }} transition={{ duration: 0.52, ease: "linear", delay: 0.18 }}
+              />
+            </motion.div>
+
+            {/* Header row */}
+            <motion.div variants={childV} className="flex items-center justify-between mb-2 px-1">
+              <div className="flex items-center gap-2.5">
+                <motion.span className="w-2.5 h-2.5 rounded-full bg-red-500" style={{ boxShadow: "0 0 10px #ef4444" }}
+                  animate={{ scale: [1, 1.35, 1], opacity: [1, 0.55, 1] }} transition={{ repeat: Infinity, duration: 1.4, ease: "easeInOut" }}
+                />
+                <span className="text-white font-cinzel font-semibold text-sm tracking-widest uppercase">Live · {platformName}</span>
+                {latency !== null && playerState === "playing" && (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-white/8 text-white/40 font-mono">
+                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400/70" />
+                    {latency}s latency
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-1.5">
                 <a href={liveRoomUrl} target="_blank" rel="noopener noreferrer"
-                  className="border border-white/30 text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-white/10 transition-colors">
+                  className="hidden sm:inline-flex text-xs text-white/50 hover:text-white/90 border border-white/12 hover:border-purple-400/40 px-2.5 py-1.5 rounded-full transition-all duration-200">
                   Buka di {platformName} ↗
                 </a>
+                <motion.button onClick={onClose}
+                  className="text-xs text-white/50 hover:text-red-400 border border-white/12 hover:border-red-400/40 px-2.5 py-1.5 rounded-full transition-all duration-200"
+                  whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}>
+                  ✕ Tutup
+                </motion.button>
               </div>
-            </div>
-          )}
-        </div>
+            </motion.div>
 
-        <p className="text-white/30 text-xs mt-3 text-center max-w-md">
-          Stream langsung dari {platformName}. Jika tidak bisa diputar tekan "Refresh Stream"
-          atau buka langsung di {platformName}.
-        </p>
-      </motion.div>
-    </AnimatePresence>
+            {/* Video */}
+            <motion.div ref={containerRef} variants={videoV}
+              className="w-full aspect-video bg-zinc-950 rounded-2xl overflow-hidden relative shadow-2xl"
+              style={{ border: "1px solid rgba(150,80,255,0.15)" }}
+              onMouseEnter={handleVideoMouseEnter} onMouseMove={handleVideoMouseMove} onMouseLeave={handleVideoMouseLeave}
+              onClick={() => setShowQuality(false)}
+            >
+              {["top-0 left-0 border-t-2 border-l-2 rounded-tl-2xl","top-0 right-0 border-t-2 border-r-2 rounded-tr-2xl","bottom-0 left-0 border-b-2 border-l-2 rounded-bl-2xl","bottom-0 right-0 border-b-2 border-r-2 rounded-br-2xl"].map((cls, i) => (
+                <motion.div key={i} className={`absolute w-6 h-6 ${cls} pointer-events-none`}
+                  style={{ borderColor: "hsl(270,60%,55%,0.7)", zIndex: 10 }}
+                  initial={{ opacity: 0, scale: 0.4 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.4 }}
+                  transition={{ duration: 0.28, delay: 0.36 + i * 0.055, ease: E.easeOut }}
+                />
+              ))}
+
+              <video ref={videoRef} className="w-full h-full" autoPlay playsInline />
+
+              {/* Controls */}
+              <AnimatePresence>
+                {showControls && playerState === "playing" && (
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
+                    transition={{ duration: 0.2, ease: E.easeOut }}
+                    className="absolute bottom-0 left-0 right-0 z-20 px-3 pb-3 pt-10"
+                    style={{ background: "linear-gradient(to top,rgba(5,3,12,0.9) 0%,transparent 100%)" }}
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseEnter={handleControlBarEnter} onMouseLeave={handleControlBarLeave}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-red-600/90 mr-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                        <span className="text-white text-[10px] font-black tracking-widest">LIVE</span>
+                      </div>
+
+                      <div className="relative flex items-center gap-1"
+                        onMouseEnter={() => { if (volTimerRef.current) clearTimeout(volTimerRef.current); setShowVolume(true); }}
+                        onMouseLeave={() => { volTimerRef.current = setTimeout(() => setShowVolume(false), 500); }}
+                      >
+                        <button onClick={toggleMute} className="w-8 h-8 flex items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-purple-500/20 transition-all duration-150"
+                          title={isMuted ? "Unmute (M)" : "Mute (M)"}>
+                          {isMuted ? <IconMute /> : <IconVolume />}
+                        </button>
+                        <AnimatePresence>
+                          {showVolume && (
+                            <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 72 }} exit={{ opacity: 0, width: 0 }} transition={{ duration: 0.18 }} className="overflow-hidden">
+                              <input type="range" min={0} max={1} step={0.05} value={isMuted ? 0 : volume}
+                                onChange={(e) => handleVolume(parseFloat(e.target.value))}
+                                className="w-full h-1 rounded-full cursor-pointer appearance-none"
+                                style={{ accentColor: "hsl(270,60%,55%)", background: `linear-gradient(to right,hsl(270,60%,55%) ${(isMuted?0:volume)*100}%,rgba(255,255,255,0.2) ${(isMuted?0:volume)*100}%)` }}
+                              />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+
+                      <div className="flex-1" />
+
+                      {showQualityBtn && (
+                        <div className="relative">
+                          <button onClick={(e) => { e.stopPropagation(); setShowQuality(p => !p); }}
+                            className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-white/70 hover:text-white hover:bg-purple-500/20 transition-all duration-150 text-xs font-semibold">
+                            <IconQuality />
+                            <span className="hidden sm:inline">{currentQualityLabel}</span>
+                          </button>
+                          <AnimatePresence>
+                            {showQuality && (
+                              <motion.div initial={{ opacity: 0, scale: 0.9, y: 6 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 6 }}
+                                transition={{ duration: 0.16, ease: E.easeOut }}
+                                className="absolute bottom-10 right-0 rounded-xl overflow-hidden shadow-2xl min-w-[120px]"
+                                style={{ background: "rgba(10,5,20,0.97)", border: "1px solid rgba(150,80,255,0.2)", backdropFilter: "blur(16px)" }}
+                                onClick={(e) => e.stopPropagation()} onMouseEnter={handleControlBarEnter} onMouseLeave={handleControlBarLeave}
+                              >
+                                <div className="px-3 py-2 border-b border-purple-500/15">
+                                  <p className="text-[10px] uppercase tracking-widest text-white/40 font-semibold">Kualitas</p>
+                                </div>
+                                {hasUrlQualities && streamQualities.map((q) => (
+                                  <button key={q.url} onClick={() => switchUrlQuality(q)}
+                                    className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-purple-500/10 transition-colors duration-150 text-left">
+                                    <span className={`text-sm font-medium ${activeUrlQuality === q.url ? "text-purple-400" : "text-white/80"}`}>{q.label}</span>
+                                    {activeUrlQuality === q.url && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-purple-400" />}
+                                  </button>
+                                ))}
+                                {hasHlsQualities && [{ index: -1, label: "Auto", height: 9999 }, ...hlsQualities].map((q) => (
+                                  <button key={q.index} onClick={() => switchHlsLevel(q.index)}
+                                    className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-purple-500/10 transition-colors duration-150 text-left">
+                                    <span className={`text-sm font-medium ${currentHlsLevel === q.index ? "text-purple-400" : "text-white/80"}`}>{q.label}</span>
+                                    {currentHlsLevel === q.index && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-purple-400" />}
+                                  </button>
+                                ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
+
+                      <button onClick={handleRefreshStream} className="w-8 h-8 flex items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-purple-500/20 transition-all duration-150" title="Refresh stream">
+                        <IconRefresh />
+                      </button>
+                      <button onClick={() => setIsTheater(p => !p)}
+                        className={`w-8 h-8 hidden sm:flex items-center justify-center rounded-lg transition-all duration-150 ${isTheater ? "text-purple-400 bg-purple-500/15" : "text-white/70 hover:text-white hover:bg-purple-500/20"}`}
+                        title="Theater mode (T)">
+                        <IconTheater />
+                      </button>
+                      {document.pictureInPictureEnabled && (
+                        <button onClick={togglePiP}
+                          className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 ${isPiPActive ? "text-purple-400 bg-purple-500/15" : "text-white/70 hover:text-white hover:bg-purple-500/20"}`}
+                          title="Picture-in-Picture">
+                          <IconPiP />
+                        </button>
+                      )}
+                      <button onClick={toggleFullscreen} className="w-8 h-8 flex items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-purple-500/20 transition-all duration-150"
+                        title={isFullscreen ? "Exit fullscreen (F)" : "Fullscreen (F)"}>
+                        {isFullscreen ? <IconShrink /> : <IconExpand />}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Loading */}
+              {(playerState === "loading" || playerState === "refreshing") && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/85 gap-5 z-10">
+                  <div className="relative w-16 h-16">
+                    <motion.div className="absolute inset-0 rounded-full border-2" style={{ borderColor: "rgba(120,60,200,0.2)" }}
+                      animate={{ scale: [1,1.4,1], opacity: [0.5,0,0.5] }} transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }} />
+                    <motion.div className="absolute inset-0 rounded-full border-2" style={{ borderColor: "rgba(120,60,200,0.1)" }}
+                      animate={{ scale: [1,1.7,1], opacity: [0.3,0,0.3] }} transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut", delay: 0.3 }} />
+                    <div className="absolute inset-0 rounded-full border-2" style={{ borderColor: "rgba(150,80,255,0.08)" }} />
+                    <motion.div className="absolute inset-0 rounded-full border-t-2" style={{ borderColor: "hsl(270,60%,55%)" }}
+                      animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 0.85, ease: "linear" }} />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-0 h-0 ml-1" style={{ borderTop: "6px solid transparent", borderBottom: "6px solid transparent", borderLeft: "10px solid hsl(270,60%,55%,0.7)" }} />
+                    </div>
+                  </div>
+                  <motion.p className="text-white/50 text-sm tracking-wide font-garamond"
+                    animate={{ opacity: [0.5,1,0.5] }} transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}>
+                    {playerState === "refreshing" ? "Menyegarkan stream…" : "Menghubungkan ke stream…"}
+                  </motion.p>
+                </div>
+              )}
+
+              {/* Error */}
+              {playerState === "error" && (
+                <motion.div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/92 p-8 text-center gap-4 z-10"
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+                  <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-2xl">⚠</div>
+                  <div>
+                    <p className="text-white font-cinzel font-semibold mb-1">Stream Error</p>
+                    <p className="text-white/40 text-sm font-garamond">{errorMsg}</p>
+                  </div>
+                  <div className="flex gap-3 flex-wrap justify-center">
+                    <motion.button onClick={handleRefreshStream}
+                      className="px-5 py-2 rounded-full text-sm font-semibold transition-colors font-cinzel"
+                      style={{ background: "linear-gradient(135deg,hsl(270,60%,55%),hsl(280,50%,40%))", color: "#fff" }}
+                      whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
+                      Refresh Stream
+                    </motion.button>
+                    <a href={liveRoomUrl} target="_blank" rel="noopener noreferrer"
+                      className="border border-white/20 text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-white/8 transition-colors">
+                      Buka di {platformName} ↗
+                    </a>
+                  </div>
+                </motion.div>
+              )}
+            </motion.div>
+
+            {/* Footer hints */}
+            <motion.div variants={footerV} className="flex items-center justify-between mt-2.5 px-1">
+              <p className="text-white/20 text-xs font-garamond">
+                Tekan <kbd className="px-1.5 py-0.5 rounded bg-white/8 text-white/35 text-[10px] font-mono">ESC</kbd> atau klik backdrop untuk menutup
+              </p>
+              <div className="flex items-center gap-3 text-[11px] text-white/25">
+                <span className="hidden sm:inline"><kbd className="px-1 py-0.5 rounded bg-white/8 text-[10px] font-mono">M</kbd> mute</span>
+                <span className="hidden sm:inline"><kbd className="px-1 py-0.5 rounded bg-white/8 text-[10px] font-mono">F</kbd> fullscreen</span>
+                <span className="hidden sm:inline"><kbd className="px-1 py-0.5 rounded bg-white/8 text-[10px] font-mono">T</kbd> theater</span>
+              </div>
+            </motion.div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
   );
 };
 
+/* ─── Signal Wave ────────────────────────────────────── */
+const SignalWave = ({ active }: { active: boolean }) => (
+  <div className="flex items-end gap-[3px] h-5">
+    {[0.4, 0.65, 1, 0.65, 0.4].map((h, i) => (
+      <div key={i} className="w-[3px] rounded-full transition-all duration-500"
+        style={{
+          height: `${h * 20}px`,
+          background: active ? "hsl(270,60%,65%)" : "hsl(270,20%,28%)",
+          animation: active ? `signalPulse 1.2s ease-in-out ${i * 0.12}s infinite` : "none",
+        }}
+      />
+    ))}
+    <style>{`@keyframes signalPulse{0%,100%{transform:scaleY(1);opacity:1}50%{transform:scaleY(0.4);opacity:0.5}}`}</style>
+  </div>
+);
+
+/* ─── Platform Card ──────────────────────────────────── */
+const PlatformCard = ({
+  status, logo, label, profileUrl, displayName, onWatch, isLoadingStream, animDelay,
+}: {
+  status: PlatformStatus; logo: string; label: string; profileUrl: string;
+  displayName: string; onWatch: () => void; isLoadingStream: boolean; animDelay: number;
+}) => {
+  const { isLive, isChecking } = status;
+  return (
+    <motion.div initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: animDelay, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+      className="relative flex flex-col rounded-3xl overflow-hidden border transition-all duration-500"
+      style={{
+        background:  "hsl(270,25%,10%)",
+        borderColor: isLive ? "hsl(270,60%,55%,0.45)" : "hsl(270,20%,18%)",
+        boxShadow:   isLive ? "0 0 40px hsl(270,60%,40%,0.15),0 4px 24px rgba(0,0,0,0.4)" : "0 4px 24px rgba(0,0,0,0.3)",
+      }}
+    >
+      <div className="absolute top-0 left-0 right-0 h-[2px] transition-all duration-500"
+        style={{ background: isLive ? "linear-gradient(90deg,transparent 0%,hsl(270,60%,60%) 50%,transparent 100%)" : "transparent" }}
+      />
+      <div className="p-6 flex flex-col gap-5 flex-1">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300"
+              style={{ background: isLive ? "hsl(270,60%,55%,0.15)" : "hsl(270,20%,14%)", border: `1px solid ${isLive ? "hsl(270,60%,55%,0.3)" : "hsl(270,20%,22%)"}` }}>
+              <img src={logo} alt={label} className="w-6 h-6 object-contain rounded-md" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold mb-0.5">Platform</p>
+              <p className="text-base font-cinzel font-bold text-foreground">{label}</p>
+            </div>
+          </div>
+          {isChecking ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/40 border border-border/40">
+              <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-pulse" />
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Cek...</span>
+            </div>
+          ) : isLive ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/12 border border-red-500/25">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" style={{ boxShadow: "0 0 6px #ef4444" }} />
+              <span className="text-[11px] font-black text-red-400 uppercase tracking-widest">On Air</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/40 border border-border/40">
+              <span className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Offline</span>
+            </div>
+          )}
+        </div>
+
+        <div className="h-px" style={{ background: "hsl(270,20%,18%)" }} />
+
+        <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 py-2">
+          {isChecking ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex items-end gap-[3px] h-6">
+                {[0.4,0.7,1,0.7,0.4].map((h, i) => (
+                  <div key={i} className="w-[3px] rounded-full bg-muted/50 animate-pulse" style={{ height: `${h * 24}px`, animationDelay: `${i * 0.15}s` }} />
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground font-garamond">Memeriksa status stream…</p>
+            </div>
+          ) : isLive ? (
+            <>
+              <SignalWave active />
+              <div>
+                <p className="text-lg font-cinzel font-bold text-foreground leading-tight">{displayName}</p>
+                <p className="text-sm font-garamond mt-0.5" style={{ color: "hsl(270,60%,70%)" }}>sedang live sekarang!</p>
+              </div>
+              <button onClick={onWatch} disabled={isLoadingStream}
+                className="w-full max-w-[220px] inline-flex items-center justify-center gap-2.5 rounded-2xl py-3 px-6 font-bold text-sm transition-all duration-200 active:scale-95 disabled:opacity-60 font-cinzel"
+                style={{ background: "linear-gradient(135deg,hsl(270,60%,55%),hsl(280,50%,40%))", color: "#fff", boxShadow: "0 4px 24px hsl(270,60%,40%,0.5)" }}>
+                {isLoadingStream ? (
+                  <><span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />Memuat…</>
+                ) : (
+                  <><span className="text-lg leading-none">▶</span>Tonton Sekarang</>
+                )}
+              </button>
+              {status.liveUrl && (
+                <a href={status.liveUrl} target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground hover:text-purple-400 transition-colors duration-200 underline underline-offset-4 decoration-dotted font-garamond">
+                  Buka langsung di {label} ↗
+                </a>
+              )}
+            </>
+          ) : (
+            <>
+              <SignalWave active={false} />
+              <div>
+                <p className="text-base font-cinzel font-semibold text-foreground/70">Sedang tidak live</p>
+                <p className="text-xs text-muted-foreground mt-1 font-garamond">Tidak ada live stream di {label} saat ini.</p>
+              </div>
+              <a href={profileUrl} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 border px-5 py-2 rounded-2xl text-sm font-semibold transition-all duration-200 font-cinzel"
+                style={{ borderColor: "hsl(270,20%,25%)", color: "hsl(270,20%,60%)" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "hsl(270,60%,45%,0.5)"; (e.currentTarget as HTMLAnchorElement).style.color = "hsl(270,80%,80%)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "hsl(270,20%,25%)"; (e.currentTarget as HTMLAnchorElement).style.color = "hsl(270,20%,60%)"; }}>
+                Kunjungi Profil <span className="opacity-50">↗</span>
+              </a>
+            </>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+/* ─── Stat Badge ─────────────────────────────────────── */
+const StatBadge = ({ logo, label, isLive, isLoading, stat1Label, stat1Value, stat2Label, stat2Value }: {
+  logo: string; label: string; isLive: boolean; isLoading: boolean;
+  stat1Label: string; stat1Value: string; stat2Label: string; stat2Value: string;
+}) => (
+  <div className="rounded-xl px-3 py-2.5 flex items-center gap-3 transition-all duration-300"
+    style={{ background: isLive ? "hsl(270,60%,55%,0.08)" : "hsl(270,20%,12%)", border: `1px solid ${isLive ? "hsl(270,60%,55%,0.28)" : "hsl(270,20%,18%)"}` }}>
+    <div className="flex items-center gap-1.5 w-[76px] flex-shrink-0">
+      <img src={logo} alt={label} className="w-4 h-4 rounded object-contain flex-shrink-0" />
+      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide leading-tight">{label}</span>
+      {isLive && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" style={{ boxShadow: "0 0 4px #ef4444" }} />}
+    </div>
+    <div className="w-px h-7 bg-border/40 flex-shrink-0" />
+    <div className="flex items-center gap-3 flex-1 min-w-0">
+      <div className="flex flex-col items-center min-w-0 flex-1">
+        {isLoading ? <div className="h-4 w-8 rounded bg-muted/60 animate-pulse mb-0.5" /> : <p className="text-sm font-black text-foreground tabular-nums leading-none">{stat1Value}</p>}
+        <p className="text-[8px] uppercase tracking-wide text-muted-foreground mt-0.5">{stat1Label}</p>
+      </div>
+      <div className="w-px h-6 bg-border/30 flex-shrink-0" />
+      <div className="flex flex-col items-center min-w-0 flex-1">
+        {isLoading ? <div className="h-4 w-6 rounded bg-muted/60 animate-pulse mb-0.5" /> : <p className="text-sm font-black text-foreground tabular-nums leading-none">{stat2Value}</p>}
+        <p className="text-[8px] uppercase tracking-wide text-muted-foreground mt-0.5">{stat2Label}</p>
+      </div>
+    </div>
+  </div>
+);
+
+/* ─── Main Page ──────────────────────────────────────── */
 const LiveStatusPage = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [idn, setIdn] = useState<PlatformStatus>({
-    isLive: false, isChecking: true, lastChecked: null, liveUrl: null, streamUrl: null, slug: null,
-  });
-  const [showroom, setShowroom] = useState<PlatformStatus>({
-    isLive: false, isChecking: true, lastChecked: null, liveUrl: null, streamUrl: null, slug: null,
-  });
+  const [idn, setIdn] = useState<PlatformStatus>({ isLive: false, isChecking: true, lastChecked: null, liveUrl: null, streamUrl: null, slug: null });
+  const [showroom, setShowroom] = useState<PlatformStatus>({ isLive: false, isChecking: true, lastChecked: null, liveUrl: null, streamUrl: null, slug: null });
+  const [profile, setProfile] = useState<ProfileStats>({ display_name: DISPLAY_NAME_FALLBACK, followers: FOLLOWERS_FALLBACK, following: FOLLOWING_FALLBACK, isLoading: true });
+  const [srProfile, setSrProfile] = useState<ShowroomProfileStats>({ followers: SR_FOLLOWERS_FALLBACK, level: SR_LEVEL_FALLBACK, isLoading: true });
 
-  const [activePlayer, setActivePlayer] = useState<null | "idn" | "showroom">(null);
-  const [activeStreamUrl, setActiveStreamUrl] = useState<string | null>(null);
-  const [isLoadingStream, setIsLoadingStream] = useState<"idn" | "showroom" | null>(null);
+  const [activePlayer,      setActivePlayer]      = useState<null | "idn" | "showroom">(null);
+  const [activeStreamUrl,   setActiveStreamUrl]   = useState<string>("");
+  const [activeStreamQuals, setActiveStreamQuals] = useState<UrlQuality[]>([]);
+  const [activeLiveUrl,     setActiveLiveUrl]     = useState<string>("");
+  const [activePlatform,    setActivePlatform]    = useState<string>("");
+  const [isLoadingStream,   setIsLoadingStream]   = useState<"idn" | "showroom" | null>(null);
 
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  useEffect(() => { const t = setInterval(() => setCurrentTime(new Date()), 1000); return () => clearInterval(t); }, []);
 
   const checkIdnStatus = useCallback(async () => {
-    setIdn(prev => ({ ...prev, isChecking: true }));
+    setIdn(p => ({ ...p, isChecking: true }));
     try {
-      const { data, error } = await supabase.functions.invoke('check-idn-live', {
-        body: { username: IDN_USERNAME },
-      });
+      const { data, error } = await supabase.functions.invoke("check-idn-live", { body: { username: IDN_USERNAME } });
       if (error) throw error;
       const slugMatch = data?.live_url?.match(/\/live\/([\w-]+)/);
-      setIdn({
-        isLive: data?.is_live ?? false,
-        isChecking: false,
-        lastChecked: data?.checked_at ?? new Date().toISOString(),
-        liveUrl: data?.live_url ?? `https://www.idn.app/${IDN_USERNAME}`,
-        streamUrl: data?.stream_url ?? null,
-        slug: slugMatch ? slugMatch[1] : null,
-      });
-    } catch (err) {
-      console.error('Failed to check IDN live status:', err);
-      setIdn(prev => ({ ...prev, isLive: false, isChecking: false }));
-    }
+      setIdn({ isLive: data?.is_live ?? false, isChecking: false, lastChecked: data?.checked_at ?? new Date().toISOString(), liveUrl: data?.live_url ?? `https://www.idn.app/${IDN_USERNAME}`, streamUrl: data?.stream_url ?? null, slug: slugMatch ? slugMatch[1] : null });
+    } catch { setIdn(p => ({ ...p, isLive: false, isChecking: false })); }
   }, []);
 
   const checkShowroomStatus = useCallback(async () => {
-    setShowroom(prev => ({ ...prev, isChecking: true }));
+    setShowroom(p => ({ ...p, isChecking: true }));
     try {
-      const { data, error } = await supabase.functions.invoke('check-showroom-live', {
-        body: { room_url_key: SHOWROOM_KEY },
-      });
+      const { data, error } = await supabase.functions.invoke("check-showroom-live", { body: { room_url_key: SHOWROOM_KEY } });
       if (error) throw error;
-      setShowroom({
-        isLive: data?.is_live ?? false,
-        isChecking: false,
-        lastChecked: data?.checked_at ?? new Date().toISOString(),
-        liveUrl: `https://www.showroom-live.com/r/${SHOWROOM_KEY}`,
-        streamUrl: data?.stream_url ?? null,
-        slug: null,
-      });
-    } catch (err) {
-      console.error('Failed to check Showroom live status:', err);
-      setShowroom(prev => ({ ...prev, isLive: false, isChecking: false }));
-    }
+      setShowroom({ isLive: data?.is_live ?? false, isChecking: false, lastChecked: data?.checked_at ?? new Date().toISOString(), liveUrl: data?.is_live ? `https://www.showroom-live.com/r/${SHOWROOM_KEY}` : `https://www.showroom-live.com/room/profile?room_id=${SHOWROOM_ROOM_ID}`, streamUrl: data?.stream_url ?? null, slug: null });
+    } catch { setShowroom(p => ({ ...p, isLive: false, isChecking: false })); }
   }, []);
 
-  useEffect(() => {
-    checkIdnStatus();
-    checkShowroomStatus();
-  }, [checkIdnStatus, checkShowroomStatus]);
+  useEffect(() => { checkIdnStatus(); checkShowroomStatus(); }, [checkIdnStatus, checkShowroomStatus]);
+
+  const fetchProfile = useCallback(async () => {
+    setProfile(p => ({ ...p, isLoading: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke("get-idn-profile", { body: { username: IDN_USERNAME } });
+      if (error) throw error;
+      setProfile({ display_name: data?.display_name ?? DISPLAY_NAME_FALLBACK, followers: data?.followers_formatted ?? FOLLOWERS_FALLBACK, following: data?.following_formatted ?? FOLLOWING_FALLBACK, isLoading: false });
+    } catch { setProfile({ display_name: DISPLAY_NAME_FALLBACK, followers: FOLLOWERS_FALLBACK, following: FOLLOWING_FALLBACK, isLoading: false }); }
+  }, []);
+
+  useEffect(() => { fetchProfile(); }, [fetchProfile]);
+
+  const fetchShowroomProfile = useCallback(async () => {
+    setSrProfile(p => ({ ...p, isLoading: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke("get-showroom-profile", { body: { room_id: SHOWROOM_ROOM_ID } });
+      if (error) throw error;
+      setSrProfile({ followers: data?.followers_formatted ?? SR_FOLLOWERS_FALLBACK, level: data?.level_formatted ?? data?.level ?? SR_LEVEL_FALLBACK, isLoading: false });
+    } catch { setSrProfile({ followers: SR_FOLLOWERS_FALLBACK, level: SR_LEVEL_FALLBACK, isLoading: false }); }
+  }, []);
+
+  useEffect(() => { fetchShowroomProfile(); }, [fetchShowroomProfile]);
 
   const handleWatchIDN = useCallback(async () => {
-    if (idn.streamUrl) {
-      setActiveStreamUrl(idn.streamUrl);
-      setActivePlayer("idn");
-      return;
-    }
+    const profileUrl = `https://www.idn.app/${IDN_USERNAME}`;
+    if (idn.streamUrl) { setActiveStreamUrl(idn.streamUrl); setActiveStreamQuals([]); setActiveLiveUrl(idn.liveUrl ?? profileUrl); setActivePlatform("IDN Live"); setActivePlayer("idn"); return; }
     if (idn.slug) {
       setIsLoadingStream("idn");
       try {
-        const { data, error } = await supabase.functions.invoke('get-idn-stream', {
-          body: { username: IDN_USERNAME, slug: idn.slug },
-        });
-        if (!error && data?.stream_url) {
-          setActiveStreamUrl(data.stream_url);
-          setActivePlayer("idn");
-        } else {
-          window.open(idn.liveUrl ?? `https://www.idn.app/${IDN_USERNAME}`, '_blank');
-        }
-      } catch {
-        window.open(idn.liveUrl ?? `https://www.idn.app/${IDN_USERNAME}`, '_blank');
-      } finally {
-        setIsLoadingStream(null);
-      }
+        const { data, error } = await supabase.functions.invoke("get-idn-stream", { body: { username: IDN_USERNAME, slug: idn.slug } });
+        if (!error && data?.stream_url) { setActiveStreamUrl(data.stream_url); setActiveStreamQuals([]); setActiveLiveUrl(idn.liveUrl ?? profileUrl); setActivePlatform("IDN Live"); setActivePlayer("idn"); }
+        else { window.open(idn.liveUrl ?? profileUrl, "_blank"); }
+      } catch { window.open(idn.liveUrl ?? profileUrl, "_blank"); }
+      finally  { setIsLoadingStream(null); }
       return;
     }
-    window.open(idn.liveUrl ?? `https://www.idn.app/${IDN_USERNAME}`, '_blank');
+    window.open(idn.liveUrl ?? profileUrl, "_blank");
   }, [idn]);
 
   const handleRefreshIDN = useCallback(async (): Promise<string | null> => {
     if (!idn.slug) return null;
-    try {
-      const { data, error } = await supabase.functions.invoke('get-idn-stream', {
-        body: { username: IDN_USERNAME, slug: idn.slug },
-      });
-      return (!error && data?.stream_url) ? data.stream_url : null;
-    } catch { return null; }
+    try { const { data, error } = await supabase.functions.invoke("get-idn-stream", { body: { username: IDN_USERNAME, slug: idn.slug } }); return (!error && data?.stream_url) ? data.stream_url : null; }
+    catch { return null; }
   }, [idn.slug]);
 
   const handleWatchShowroom = useCallback(async () => {
-    if (showroom.streamUrl) {
-      setActiveStreamUrl(showroom.streamUrl);
-      setActivePlayer("showroom");
-      return;
-    }
+    const profileUrl = `https://www.showroom-live.com/room/profile?room_id=${SHOWROOM_ROOM_ID}`;
+    if (showroom.streamUrl) { setActiveStreamUrl(showroom.streamUrl); setActiveStreamQuals([]); setActiveLiveUrl(showroom.liveUrl ?? profileUrl); setActivePlatform("Showroom"); setActivePlayer("showroom"); return; }
     setIsLoadingStream("showroom");
     try {
-      const { data, error } = await supabase.functions.invoke('check-showroom-live', {
-        body: { room_url_key: SHOWROOM_KEY },
-      });
+      const { data, error } = await supabase.functions.invoke("check-showroom-live", { body: { room_url_key: SHOWROOM_KEY } });
       if (!error && data?.stream_url) {
-        setShowroom(prev => ({ ...prev, streamUrl: data.stream_url }));
-        setActiveStreamUrl(data.stream_url);
-        setActivePlayer("showroom");
-      } else {
-        window.open(`https://www.showroom-live.com/r/${SHOWROOM_KEY}`, '_blank');
-      }
-    } catch {
-      window.open(`https://www.showroom-live.com/r/${SHOWROOM_KEY}`, '_blank');
-    } finally {
-      setIsLoadingStream(null);
-    }
-  }, [showroom.streamUrl]);
+        setShowroom(p => ({ ...p, streamUrl: data.stream_url }));
+        const quals: UrlQuality[] = [];
+        if (data.stream_url) quals.push({ label: "Tinggi", url: data.stream_url });
+        if (data.stream_url_low && data.stream_url_low !== data.stream_url) quals.push({ label: "Rendah", url: data.stream_url_low });
+        setActiveStreamUrl(data.stream_url); setActiveStreamQuals(quals); setActiveLiveUrl(showroom.liveUrl ?? profileUrl); setActivePlatform("Showroom"); setActivePlayer("showroom");
+      } else { window.open(profileUrl, "_blank"); }
+    } catch { window.open(profileUrl, "_blank"); }
+    finally  { setIsLoadingStream(null); }
+  }, [showroom]);
 
   const handleRefreshShowroom = useCallback(async (): Promise<string | null> => {
-    try {
-      const { data, error } = await supabase.functions.invoke('check-showroom-live', {
-        body: { room_url_key: SHOWROOM_KEY },
-      });
-      return (!error && data?.stream_url) ? data.stream_url : null;
-    } catch { return null; }
+    try { const { data, error } = await supabase.functions.invoke("check-showroom-live", { body: { room_url_key: SHOWROOM_KEY } }); return (!error && data?.stream_url) ? data.stream_url : null; }
+    catch { return null; }
   }, []);
 
-  const formatDate = (date: Date) => {
-    const d = date.getDate(), mo = date.getMonth() + 1, y = date.getFullYear();
-    const h = String(date.getHours()).padStart(2, "0");
-    const m = String(date.getMinutes()).padStart(2, "0");
-    const s = String(date.getSeconds()).padStart(2, "0");
-    return `${d}/${mo}/${y}, ${h}.${m}.${s}`;
+  const closePlayer   = useCallback(() => setActivePlayer(null), []);
+  const handleRefresh = activePlayer === "idn" ? handleRefreshIDN : handleRefreshShowroom;
+
+  const formatTime = (d: Date) => `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}:${String(d.getSeconds()).padStart(2,"0")}`;
+  const formatDate = (d: Date) => {
+    const days   = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+    const months = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+    return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
   };
 
-  const isAnyLive = idn.isLive || showroom.isLive;
+  const isAnyLive     = idn.isLive || showroom.isLive;
   const idnProfileUrl = `https://www.idn.app/${IDN_USERNAME}`;
-  const showroomProfileUrl = `https://www.showroom-live.com/r/${SHOWROOM_KEY}`;
+  const srProfileUrl  = `https://www.showroom-live.com/room/profile?room_id=${SHOWROOM_ROOM_ID}`;
 
   return (
     <div className="min-h-screen">
+      <HlsPlayer isOpen={activePlayer !== null} streamUrl={activeStreamUrl} streamQualities={activeStreamQuals}
+        liveRoomUrl={activeLiveUrl} platformName={activePlatform} onClose={closePlayer} onRefresh={handleRefresh} />
 
-      {/* ── HLS Player Modal ── */}
-      {activePlayer === "idn" && activeStreamUrl && (
-        <HlsPlayer
-          streamUrl={activeStreamUrl}
-          liveRoomUrl={idn.liveUrl ?? idnProfileUrl}
-          platformName="IDN Live"
-          onClose={() => { setActivePlayer(null); setActiveStreamUrl(null); }}
-          onRefresh={handleRefreshIDN}
-        />
-      )}
-      {activePlayer === "showroom" && activeStreamUrl && (
-        <HlsPlayer
-          streamUrl={activeStreamUrl}
-          liveRoomUrl={showroom.liveUrl ?? showroomProfileUrl}
-          platformName="Showroom"
-          onClose={() => { setActivePlayer(null); setActiveStreamUrl(null); }}
-          onRefresh={handleRefreshShowroom}
-        />
-      )}
-
-      {/* Header Banner */}
-      <div className="relative h-48 md:h-56 overflow-hidden">
-        <div className="absolute inset-0 gradient-purple-dark" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background" />
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
-          className="relative z-10 flex items-center justify-center h-full">
-          <h1 className="text-3xl md:text-5xl font-cinzel font-bold gradient-purple-text">
+      {/* ── Hero Banner ── */}
+      <div className="relative h-52 md:h-64 overflow-hidden">
+        <div className="absolute inset-0" style={{ background: "linear-gradient(135deg,hsl(270,50%,10%) 0%,hsl(280,60%,8%) 100%)" }} />
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-8 left-12 w-56 h-56 rounded-full blur-[100px]" style={{ background: "hsl(270,60%,45%)" }} />
+          <div className="absolute bottom-8 right-16 w-72 h-72 rounded-full blur-[120px]" style={{ background: "hsl(280,50%,35%)" }} />
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
+        <div className="absolute inset-0 opacity-[0.04]"
+          style={{ backgroundImage: "radial-gradient(circle at 1px 1px,hsl(270,80%,80%) 1px,transparent 0)", backgroundSize: "28px 28px" }} />
+        <motion.div initial={{ opacity: 0, y: -24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}
+          className="relative z-10 flex flex-col items-center justify-center h-full gap-3">
+          <motion.div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border mb-1 transition-all duration-500"
+            style={{ background: isAnyLive ? "hsl(270,60%,45%,0.15)" : "hsl(270,25%,12%)", borderColor: isAnyLive ? "hsl(270,60%,55%,0.4)" : "hsl(270,20%,22%)" }}>
+            {isAnyLive ? (
+              <><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" style={{ boxShadow: "0 0 8px #ef4444" }} /><span className="text-xs font-bold text-red-400 uppercase tracking-widest">Fritzy Sedang Live!</span></>
+            ) : (
+              <><span className="w-2 h-2 rounded-full" style={{ background: "hsl(270,60%,60%)" }} /><span className="text-xs font-bold uppercase tracking-widest" style={{ color: "hsl(270,60%,70%)" }}>Live Status</span></>
+            )}
+          </motion.div>
+          <h1 className="text-3xl md:text-5xl font-cinzel font-bold"
+            style={{ background: "linear-gradient(135deg,hsl(270,80%,80%),hsl(280,60%,60%))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
             Live Status
           </h1>
         </motion.div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-3xl mx-auto px-4 mt-6 pb-16">
+      {/* ── Content ── */}
+      <div className="max-w-3xl mx-auto px-4 mt-6 pb-20 space-y-5">
 
-        {/* Profile Card */}
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="rounded-2xl border border-border bg-card p-6 shadow-lg">
+        {/* ── Profile Card ── */}
+        <motion.div initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          className="relative rounded-3xl overflow-hidden border transition-all duration-500"
+          style={{ background: "hsl(270,25%,10%)", borderColor: isAnyLive ? "hsl(270,60%,55%,0.38)" : "hsl(270,20%,18%)", boxShadow: isAnyLive ? "0 0 48px hsl(270,60%,40%,0.12),0 4px 32px rgba(0,0,0,0.35)" : "0 4px 32px rgba(0,0,0,0.25)" }}>
+          {isAnyLive && (
+            <div className="absolute top-0 left-0 right-0 h-[2px]"
+              style={{ background: "linear-gradient(90deg,transparent 0%,hsl(270,60%,60%) 50%,transparent 100%)" }} />
+          )}
+          <div className="absolute inset-0 opacity-[0.025]"
+            style={{ backgroundImage: "radial-gradient(circle at 1px 1px,hsl(270,80%,80%) 1px,transparent 0)", backgroundSize: "30px 30px" }} />
 
-          {/* Mobile */}
-          <div className="flex flex-col gap-4 md:hidden">
-            <div className="flex items-center gap-4">
-              <div className="flex-shrink-0 relative">
-                <div className={`w-16 h-16 rounded-full overflow-hidden border-4 ${isAnyLive ? 'border-red-500' : 'border-border'} transition-colors`}>
-                  <img src={fritzyProfile} alt={DISPLAY_NAME} className="w-full h-full object-cover" />
-                </div>
-                {isAnyLive && (
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">LIVE</span>
-                )}
-              </div>
-              <div className="flex-1">
-                <h2 className="text-base font-cinzel font-bold text-foreground uppercase tracking-wide">{DISPLAY_NAME}</h2>
-                <p className="text-xs text-muted-foreground font-garamond mt-0.5">{formatDate(currentTime)}</p>
-              </div>
-            </div>
-            <div className="flex items-center justify-center gap-6 pt-2 border-t border-border">
-              <div className="text-center">
-                <p className="text-lg font-bold text-foreground">{FOLLOWING}</p>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Following</p>
-              </div>
-              <div className="w-px h-8 bg-border" />
-              <div className="text-center">
-                <p className="text-lg font-bold text-foreground">{FOLLOWERS}</p>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Followers</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop */}
-          <div className="hidden md:flex items-center gap-6">
-            <div className="flex-shrink-0 relative">
-              <div className={`w-20 h-20 rounded-full overflow-hidden border-4 ${isAnyLive ? 'border-red-500' : 'border-border'} transition-colors`}>
-                <img src={fritzyProfile} alt={DISPLAY_NAME} className="w-full h-full object-cover" />
-              </div>
+          <div className="relative flex flex-col sm:flex-row items-center sm:items-stretch gap-0">
+            {/* Photo */}
+            <div className="relative flex-shrink-0 w-full sm:w-48 h-52 sm:h-auto overflow-hidden rounded-t-3xl sm:rounded-l-3xl sm:rounded-tr-none">
+              <img src={fritzyHero} alt={profile.display_name} className="w-full h-full object-cover object-top" />
+              <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom,transparent 40%,hsl(270,25%,10%,0.7))" }} />
               {isAnyLive && (
-                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-red-500 text-white text-xs font-bold px-3 py-0.5 rounded-full animate-pulse">LIVE</span>
+                <div className="absolute top-3 left-3">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg shadow-lg" style={{ background: "#ef4444" }}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                    <span className="text-white text-[10px] font-black tracking-widest">LIVE</span>
+                  </div>
+                </div>
               )}
             </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-2xl font-cinzel font-bold text-foreground uppercase tracking-wide truncate">{DISPLAY_NAME}</h2>
-              <p className="text-sm text-muted-foreground font-garamond mt-0.5">{formatDate(currentTime)}</p>
-            </div>
-            <div className="flex items-center gap-6 flex-shrink-0">
-              <div className="text-center">
-                <p className="text-xl font-bold text-foreground">{FOLLOWING}</p>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">Following</p>
+
+            {/* Info */}
+            <div className="flex-1 flex flex-col justify-between p-6 gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-1">Member JKT48</p>
+                <h3 className="text-2xl md:text-3xl font-cinzel font-bold text-foreground tracking-tight">{profile.display_name}</h3>
+                <p className="text-sm mt-1.5 font-garamond">
+                  {isAnyLive
+                    ? <span style={{ color: "hsl(270,60%,70%)" }} className="font-semibold">● Sedang live sekarang!</span>
+                    : <span className="text-muted-foreground">Tidak ada live stream saat ini</span>}
+                </p>
               </div>
-              <div className="w-px h-8 bg-border" />
-              <div className="text-center">
-                <p className="text-xl font-bold text-foreground">{FOLLOWERS}</p>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">Followers</p>
+              <div className="flex flex-col gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <StatBadge logo={idnLogo} label="IDN Live" isLive={idn.isLive} isLoading={profile.isLoading}
+                    stat1Label="Followers" stat1Value={profile.followers} stat2Label="Following" stat2Value={profile.following} />
+                  <StatBadge logo={showroomLogo} label="Showroom" isLive={showroom.isLive} isLoading={srProfile.isLoading}
+                    stat1Label="Followers" stat1Value={srProfile.followers} stat2Label="Room Level" stat2Value={srProfile.level} />
+                </div>
+                <div className="flex items-center gap-2 px-0.5">
+                  <p className="font-mono tabular-nums text-sm text-foreground/80">{formatTime(currentTime)}</p>
+                  <span className="text-muted-foreground/40">·</span>
+                  <p className="text-xs text-muted-foreground font-garamond">{formatDate(currentTime)}</p>
+                </div>
               </div>
             </div>
           </div>
         </motion.div>
 
-        {/* Platform Status Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-
-          {/* ── IDN Live Card ── */}
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="rounded-2xl border border-border bg-card p-5 shadow-lg flex flex-col">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 text-center">IDN Live</h3>
-
-            {idn.isChecking ? (
-              <div className="flex items-center justify-center gap-3 py-4 flex-1">
-                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-muted-foreground font-garamond">Memuat...</p>
-              </div>
-            ) : idn.isLive ? (
-              <div className="text-center py-3 flex-1 flex flex-col justify-center">
-                <div className="inline-flex items-center gap-2 bg-red-500/20 text-red-400 px-4 py-2 rounded-full mb-3 mx-auto">
-                  <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                  <span className="font-semibold text-sm">Sedang LIVE</span>
-                </div>
-                <p className="text-foreground font-garamond text-sm mb-4">{DISPLAY_NAME} sedang live di IDN Live!</p>
-                <div className="flex flex-col gap-2 items-center">
-                  <button onClick={handleWatchIDN} disabled={isLoadingStream === "idn"}
-                    className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-60 w-full max-w-[200px]">
-                    {isLoadingStream === "idn" ? (
-                      <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Memuat...</>
-                    ) : "▶ Tonton Sekarang"}
-                  </button>
-                  <a href={idn.liveUrl ?? idnProfileUrl} target="_blank" rel="noopener noreferrer"
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                    Buka di IDN ↗
-                  </a>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-3 flex-1 flex flex-col justify-center">
-                <div className="inline-flex items-center gap-2 bg-muted text-muted-foreground px-4 py-2 rounded-full mb-3 mx-auto">
-                  <span className="w-3 h-3 bg-muted-foreground rounded-full" />
-                  <span className="font-semibold text-sm">Tidak Live</span>
-                </div>
-                <p className="text-muted-foreground font-garamond text-sm mb-4">Tidak sedang live di IDN Live.</p>
-                <a href={idnProfileUrl} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 border border-border text-foreground px-5 py-2.5 rounded-full font-semibold text-sm hover:bg-muted transition-colors mx-auto">
-                  Kunjungi Profil IDN
-                </a>
-              </div>
-            )}
-          </motion.div>
-
-          {/* ── Showroom Card ── */}
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="rounded-2xl border border-border bg-card p-5 shadow-lg flex flex-col">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 text-center">Showroom</h3>
-
-            {showroom.isChecking ? (
-              <div className="flex items-center justify-center gap-3 py-4 flex-1">
-                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-muted-foreground font-garamond">Memuat...</p>
-              </div>
-            ) : showroom.isLive ? (
-              <div className="text-center py-3 flex-1 flex flex-col justify-center">
-                <div className="inline-flex items-center gap-2 bg-red-500/20 text-red-400 px-4 py-2 rounded-full mb-3 mx-auto">
-                  <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                  <span className="font-semibold text-sm">Sedang LIVE</span>
-                </div>
-                <p className="text-foreground font-garamond text-sm mb-4">{DISPLAY_NAME} sedang live di Showroom!</p>
-                <div className="flex flex-col gap-2 items-center">
-                  <button onClick={handleWatchShowroom} disabled={isLoadingStream === "showroom"}
-                    className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-60 w-full max-w-[200px]">
-                    {isLoadingStream === "showroom" ? (
-                      <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Memuat...</>
-                    ) : "▶ Tonton Sekarang"}
-                  </button>
-                  <a href={showroom.liveUrl ?? showroomProfileUrl} target="_blank" rel="noopener noreferrer"
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                    Buka di Showroom ↗
-                  </a>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-3 flex-1 flex flex-col justify-center">
-                <div className="inline-flex items-center gap-2 bg-muted text-muted-foreground px-4 py-2 rounded-full mb-3 mx-auto">
-                  <span className="w-3 h-3 bg-muted-foreground rounded-full" />
-                  <span className="font-semibold text-sm">Tidak Live</span>
-                </div>
-                <p className="text-muted-foreground font-garamond text-sm mb-4">Tidak sedang live di Showroom.</p>
-                <a href={showroomProfileUrl} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 border border-border text-foreground px-5 py-2.5 rounded-full font-semibold text-sm hover:bg-muted transition-colors mx-auto">
-                  Kunjungi Profil Showroom
-                </a>
-              </div>
-            )}
-          </motion.div>
-
+        {/* ── Platform Cards ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <PlatformCard status={idn} logo={idnLogo} label="IDN Live" profileUrl={idnProfileUrl} displayName={profile.display_name}
+            onWatch={handleWatchIDN} isLoadingStream={isLoadingStream === "idn"} animDelay={0.25} />
+          <PlatformCard status={showroom} logo={showroomLogo} label="Showroom" profileUrl={srProfileUrl} displayName={profile.display_name}
+            onWatch={handleWatchShowroom} isLoadingStream={isLoadingStream === "showroom"} animDelay={0.4} />
         </div>
+
+        {/* ── Footer note ── */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="text-center">
+          <p className="text-xs text-muted-foreground font-garamond">
+            Status diperbarui setiap kali halaman ini dibuka. Jika ada masalah streaming, gunakan tombol refresh di dalam player.
+          </p>
+        </motion.div>
       </div>
     </div>
   );

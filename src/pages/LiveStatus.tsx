@@ -165,7 +165,7 @@ const HlsPlayer = ({
     }
     try {
       const { default: Hls } = await import("hls.js");
-      if (!Hls.isSupported()) { setErrorMsg("Browser tidak mendukung HLS."); setPlayerState("error"); return; }
+      if (!Hls.isSupported()) { setErrorMsg("Your browser does not support HLS."); setPlayerState("error"); return; }
       if (hlsRef.current) hlsRef.current.destroy();
       const hls = new Hls({ enableWorker: true, lowLatencyMode: true, backBufferLength: 90 });
       hlsRef.current = hls;
@@ -188,11 +188,11 @@ const HlsPlayer = ({
       });
       hls.on(Hls.Events.ERROR, (_: any, data: any) => {
         if (data.fatal) {
-          setErrorMsg(data.type === "networkError" ? "Stream tidak dapat dimuat. Token mungkin sudah expire." : "Terjadi kesalahan saat memutar stream.");
+          setErrorMsg(data.type === "networkError" ? "Stream could not be loaded. The token may have expired." : "An error occurred while playing the stream.");
           setPlayerState("error");
         }
       });
-    } catch { setErrorMsg("Gagal memuat HLS player."); setPlayerState("error"); }
+    } catch { setErrorMsg("Failed to load HLS player."); setPlayerState("error"); }
   }, []);
 
   useEffect(() => {
@@ -204,7 +204,7 @@ const HlsPlayer = ({
     setPlayerState("refreshing");
     const newUrl = await onRefresh();
     if (newUrl) { await loadStream(newUrl); }
-    else { setErrorMsg("Gagal refresh. Coba buka langsung di platform."); setPlayerState("error"); }
+    else { setErrorMsg("Refresh failed. Try opening directly on the platform."); setPlayerState("error"); }
   }, [onRefresh, loadStream]);
 
   const toggleMute = useCallback(() => {
@@ -242,7 +242,7 @@ const HlsPlayer = ({
   const hasHlsQualities   = hlsQualities.length > 1;
   const showQualityBtn    = hasUrlQualities || hasHlsQualities;
   const currentQualityLabel = hasUrlQualities
-    ? (streamQualities.find(q => q.url === activeUrlQuality)?.label ?? streamQualities[0]?.label ?? "Kualitas")
+    ? (streamQualities.find(q => q.url === activeUrlQuality)?.label ?? streamQualities[0]?.label ?? "Quality")
     : currentHlsLevel === -1 ? "Auto" : (hlsQualities.find(q => q.index === currentHlsLevel)?.label ?? "Auto");
 
   const E = {
@@ -324,12 +324,12 @@ const HlsPlayer = ({
               <div className="flex gap-1.5">
                 <a href={liveRoomUrl} target="_blank" rel="noopener noreferrer"
                   className="hidden sm:inline-flex text-xs text-white/50 hover:text-white/90 border border-white/12 hover:border-purple-400/40 px-2.5 py-1.5 rounded-full transition-all duration-200">
-                  Buka di {platformName} ↗
+                  Open on {platformName} ↗
                 </a>
                 <motion.button onClick={onClose}
                   className="text-xs text-white/50 hover:text-red-400 border border-white/12 hover:border-red-400/40 px-2.5 py-1.5 rounded-full transition-all duration-200"
                   whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}>
-                  ✕ Tutup
+                  ✕ Close
                 </motion.button>
               </div>
             </motion.div>
@@ -406,7 +406,7 @@ const HlsPlayer = ({
                                 onClick={(e) => e.stopPropagation()} onMouseEnter={handleControlBarEnter} onMouseLeave={handleControlBarLeave}
                               >
                                 <div className="px-3 py-2 border-b border-purple-500/15">
-                                  <p className="text-[10px] uppercase tracking-widest text-white/40 font-semibold">Kualitas</p>
+                                  <p className="text-[10px] uppercase tracking-widest text-white/40 font-semibold">Quality</p>
                                 </div>
                                 {hasUrlQualities && streamQualities.map((q) => (
                                   <button key={q.url} onClick={() => switchUrlQuality(q)}
@@ -469,7 +469,7 @@ const HlsPlayer = ({
                   </div>
                   <motion.p className="text-white/50 text-sm tracking-wide font-garamond"
                     animate={{ opacity: [0.5,1,0.5] }} transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}>
-                    {playerState === "refreshing" ? "Menyegarkan stream…" : "Menghubungkan ke stream…"}
+                    {playerState === "refreshing" ? "Refreshing stream…" : "Connecting to stream…"}
                   </motion.p>
                 </div>
               )}
@@ -492,7 +492,7 @@ const HlsPlayer = ({
                     </motion.button>
                     <a href={liveRoomUrl} target="_blank" rel="noopener noreferrer"
                       className="border border-white/20 text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-white/8 transition-colors">
-                      Buka di {platformName} ↗
+                      Open on {platformName} ↗
                     </a>
                   </div>
                 </motion.div>
@@ -502,7 +502,7 @@ const HlsPlayer = ({
             {/* Footer hints */}
             <motion.div variants={footerV} className="flex items-center justify-between mt-2.5 px-1">
               <p className="text-white/20 text-xs font-garamond">
-                Tekan <kbd className="px-1.5 py-0.5 rounded bg-white/8 text-white/35 text-[10px] font-mono">ESC</kbd> atau klik backdrop untuk menutup
+                Press <kbd className="px-1.5 py-0.5 rounded bg-white/8 text-white/35 text-[10px] font-mono">ESC</kbd> or click the backdrop to close
               </p>
               <div className="flex items-center gap-3 text-[11px] text-white/25">
                 <span className="hidden sm:inline"><kbd className="px-1 py-0.5 rounded bg-white/8 text-[10px] font-mono">M</kbd> mute</span>
@@ -570,7 +570,7 @@ const PlatformCard = ({
           {isChecking ? (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/40 border border-border/40">
               <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-pulse" />
-              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Cek...</span>
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Checking...</span>
             </div>
           ) : isLive ? (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/12 border border-red-500/25">
@@ -595,28 +595,28 @@ const PlatformCard = ({
                   <div key={i} className="w-[3px] rounded-full bg-muted/50 animate-pulse" style={{ height: `${h * 24}px`, animationDelay: `${i * 0.15}s` }} />
                 ))}
               </div>
-              <p className="text-sm text-muted-foreground font-garamond">Memeriksa status stream…</p>
+              <p className="text-sm text-muted-foreground font-garamond">Checking stream status…</p>
             </div>
           ) : isLive ? (
             <>
               <SignalWave active />
               <div>
                 <p className="text-lg font-cinzel font-bold text-foreground leading-tight">{displayName}</p>
-                <p className="text-sm font-garamond mt-0.5" style={{ color: "hsl(270,60%,70%)" }}>sedang live sekarang!</p>
+                <p className="text-sm font-garamond mt-0.5" style={{ color: "hsl(270,60%,70%)" }}>is live right now!</p>
               </div>
               <button onClick={onWatch} disabled={isLoadingStream}
                 className="w-full max-w-[220px] inline-flex items-center justify-center gap-2.5 rounded-2xl py-3 px-6 font-bold text-sm transition-all duration-200 active:scale-95 disabled:opacity-60 font-cinzel"
                 style={{ background: "linear-gradient(135deg,hsl(270,60%,55%),hsl(280,50%,40%))", color: "#fff", boxShadow: "0 4px 24px hsl(270,60%,40%,0.5)" }}>
                 {isLoadingStream ? (
-                  <><span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />Memuat…</>
+                  <><span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />Loading…</>
                 ) : (
-                  <><span className="text-lg leading-none">▶</span>Tonton Sekarang</>
+                  <><span className="text-lg leading-none">▶</span>Watch Now</>
                 )}
               </button>
               {status.liveUrl && (
                 <a href={status.liveUrl} target="_blank" rel="noopener noreferrer"
                   className="text-xs text-muted-foreground hover:text-purple-400 transition-colors duration-200 underline underline-offset-4 decoration-dotted font-garamond">
-                  Buka langsung di {label} ↗
+                  Open directly on {label} ↗
                 </a>
               )}
             </>
@@ -624,15 +624,15 @@ const PlatformCard = ({
             <>
               <SignalWave active={false} />
               <div>
-                <p className="text-base font-cinzel font-semibold text-foreground/70">Sedang tidak live</p>
-                <p className="text-xs text-muted-foreground mt-1 font-garamond">Tidak ada live stream di {label} saat ini.</p>
+                <p className="text-base font-cinzel font-semibold text-foreground/70">Not currently live</p>
+                <p className="text-xs text-muted-foreground mt-1 font-garamond">No live stream on {label} right now.</p>
               </div>
               <a href={profileUrl} target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 border px-5 py-2 rounded-2xl text-sm font-semibold transition-all duration-200 font-cinzel"
                 style={{ borderColor: "hsl(270,20%,25%)", color: "hsl(270,20%,60%)" }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "hsl(270,60%,45%,0.5)"; (e.currentTarget as HTMLAnchorElement).style.color = "hsl(270,80%,80%)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "hsl(270,20%,25%)"; (e.currentTarget as HTMLAnchorElement).style.color = "hsl(270,20%,60%)"; }}>
-                Kunjungi Profil <span className="opacity-50">↗</span>
+                Visit Profile <span className="opacity-50">↗</span>
               </a>
             </>
           )}
@@ -760,8 +760,8 @@ const LiveStatusPage = () => {
       if (!error && data?.stream_url) {
         setShowroom(p => ({ ...p, streamUrl: data.stream_url }));
         const quals: UrlQuality[] = [];
-        if (data.stream_url) quals.push({ label: "Tinggi", url: data.stream_url });
-        if (data.stream_url_low && data.stream_url_low !== data.stream_url) quals.push({ label: "Rendah", url: data.stream_url_low });
+        if (data.stream_url) quals.push({ label: "High", url: data.stream_url });
+        if (data.stream_url_low && data.stream_url_low !== data.stream_url) quals.push({ label: "Low", url: data.stream_url_low });
         setActiveStreamUrl(data.stream_url); setActiveStreamQuals(quals); setActiveLiveUrl(showroom.liveUrl ?? profileUrl); setActivePlatform("Showroom"); setActivePlayer("showroom");
       } else { window.open(profileUrl, "_blank"); }
     } catch { window.open(profileUrl, "_blank"); }
@@ -778,8 +778,8 @@ const LiveStatusPage = () => {
 
   const formatTime = (d: Date) => `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}:${String(d.getSeconds()).padStart(2,"0")}`;
   const formatDate = (d: Date) => {
-    const days   = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
-    const months = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+    const days   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
   };
 
@@ -807,7 +807,7 @@ const LiveStatusPage = () => {
           <motion.div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border mb-1 transition-all duration-500"
             style={{ background: isAnyLive ? "hsl(270,60%,45%,0.15)" : "hsl(270,25%,12%)", borderColor: isAnyLive ? "hsl(270,60%,55%,0.4)" : "hsl(270,20%,22%)" }}>
             {isAnyLive ? (
-              <><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" style={{ boxShadow: "0 0 8px #ef4444" }} /><span className="text-xs font-bold text-red-400 uppercase tracking-widest">Fritzy Sedang Live!</span></>
+              <><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" style={{ boxShadow: "0 0 8px #ef4444" }} /><span className="text-xs font-bold text-red-400 uppercase tracking-widest">Fritzy is Live!</span></>
             ) : (
               <><span className="w-2 h-2 rounded-full" style={{ background: "hsl(270,60%,60%)" }} /><span className="text-xs font-bold uppercase tracking-widest" style={{ color: "hsl(270,60%,70%)" }}>Live Status</span></>
             )}
@@ -852,12 +852,12 @@ const LiveStatusPage = () => {
             {/* Info */}
             <div className="flex-1 flex flex-col justify-between p-6 gap-4">
               <div>
-                <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-1">Member JKT48</p>
+                <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold mb-1">JKT48 Member</p>
                 <h3 className="text-2xl md:text-3xl font-cinzel font-bold text-foreground tracking-tight">{profile.display_name}</h3>
                 <p className="text-sm mt-1.5 font-garamond">
                   {isAnyLive
-                    ? <span style={{ color: "hsl(270,60%,70%)" }} className="font-semibold">● Sedang live sekarang!</span>
-                    : <span className="text-muted-foreground">Tidak ada live stream saat ini</span>}
+                    ? <span style={{ color: "hsl(270,60%,70%)" }} className="font-semibold">● Currently live now!</span>
+                    : <span className="text-muted-foreground">No live stream at the moment</span>}
                 </p>
               </div>
               <div className="flex flex-col gap-2.5">
@@ -888,7 +888,7 @@ const LiveStatusPage = () => {
         {/* ── Footer note ── */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="text-center">
           <p className="text-xs text-muted-foreground font-garamond">
-            Status diperbarui setiap kali halaman ini dibuka. Jika ada masalah streaming, gunakan tombol refresh di dalam player.
+            Status is updated every time this page is opened. If there are streaming issues, use the refresh button inside the player.
           </p>
         </motion.div>
       </div>

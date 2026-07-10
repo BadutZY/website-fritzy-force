@@ -6,7 +6,6 @@ import fritzyHero from "@/assets/hero/fritzy-main.jpg";
 import idnLogo from "@/assets/logo/idn-logo.png";
 import showroomLogo from "@/assets/logo/showroom-logo.png";
 
-/* ─── Constants ─────────────────────────────────────── */
 const DISPLAY_NAME_FALLBACK = "Fritzy Rosmerian";
 const IDN_USERNAME          = "jkt48_fritzy";
 const FOLLOWERS_FALLBACK    = "—";
@@ -17,7 +16,6 @@ const SHOWROOM_ROOM_ID      = 510011;
 const SR_FOLLOWERS_FALLBACK = "—";
 const SR_LEVEL_FALLBACK     = "—";
 
-/* ─── Types ──────────────────────────────────────────── */
 type ProfileStats = {
   display_name: string;
   followers: string;
@@ -40,7 +38,6 @@ type PlatformStatus = {
 type UrlQuality  = { label: string; url: string };
 type HlsQuality  = { index: number; label: string; height: number };
 
-/* ─── Scroll Lock ────────────────────────────────────── */
 function useScrollLock(active: boolean) {
   useEffect(() => {
     if (!active) return;
@@ -56,7 +53,6 @@ function useScrollLock(active: boolean) {
   }, [active]);
 }
 
-/* ─── SVG Icons ──────────────────────────────────────── */
 const IconVolume  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>;
 const IconMute    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>;
 const IconExpand  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>;
@@ -66,7 +62,6 @@ const IconRefresh = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentCo
 const IconTheater = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="12" x2="22" y2="12" strokeDasharray="3 2"/></svg>;
 const IconQuality = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>;
 
-/* ─── HLS Player Modal ───────────────────────────────── */
 const HlsPlayer = ({
   isOpen, streamUrl, streamQualities, liveRoomUrl, platformName, onClose, onRefresh,
 }: {
@@ -518,7 +513,6 @@ const HlsPlayer = ({
   );
 };
 
-/* ─── Signal Wave ────────────────────────────────────── */
 const SignalWave = ({ active }: { active: boolean }) => (
   <div className="flex items-end gap-[3px] h-5">
     {[0.4, 0.65, 1, 0.65, 0.4].map((h, i) => (
@@ -534,7 +528,6 @@ const SignalWave = ({ active }: { active: boolean }) => (
   </div>
 );
 
-/* ─── Platform Card ──────────────────────────────────── */
 const PlatformCard = ({
   status, logo, label, profileUrl, displayName, onWatch, isLoadingStream, animDelay,
 }: {
@@ -642,7 +635,6 @@ const PlatformCard = ({
   );
 };
 
-/* ─── Stat Badge ─────────────────────────────────────── */
 const StatBadge = ({ logo, label, isLive, isLoading, stat1Label, stat1Value, stat2Label, stat2Value }: {
   logo: string; label: string; isLive: boolean; isLoading: boolean;
   stat1Label: string; stat1Value: string; stat2Label: string; stat2Value: string;
@@ -669,7 +661,6 @@ const StatBadge = ({ logo, label, isLive, isLoading, stat1Label, stat1Value, sta
   </div>
 );
 
-/* ─── Main Page ──────────────────────────────────────── */
 const LiveStatusPage = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [idn, setIdn] = useState<PlatformStatus>({ isLive: false, isChecking: true, lastChecked: null, liveUrl: null, streamUrl: null, slug: null });

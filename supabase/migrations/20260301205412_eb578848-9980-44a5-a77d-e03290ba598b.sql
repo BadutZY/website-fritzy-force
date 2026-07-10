@@ -11,7 +11,6 @@ CREATE TABLE public.fritzy_schedules (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
--- Allow public read access (no auth needed for viewing schedules)
 ALTER TABLE public.fritzy_schedules ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow public read access on fritzy_schedules"

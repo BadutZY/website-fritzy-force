@@ -4,17 +4,11 @@ import { ArrowLeft } from "lucide-react";
 import { ReactNode } from "react";
 
 interface NewsArticleProps {
-  /** Banner/header image for the article */
   bannerImage: string;
-  /** Article title */
   title: string;
-  /** Category label (e.g. "Berita") */
   category: string;
-  /** Author name */
   author: string;
-  /** Publication date string */
   date: string;
-  /** Article body content — use JSX for rich formatting */
   children: ReactNode;
 }
 

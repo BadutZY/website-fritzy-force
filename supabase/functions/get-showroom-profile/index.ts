@@ -17,7 +17,6 @@ serve(async (req) => {
   }
 
   try {
-    // Default room_id untuk Fritzy Rosmerian = 510011
     let room_id = 510011;
     try {
       const body = await req.json();

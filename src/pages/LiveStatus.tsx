@@ -8,13 +8,13 @@ import showroomLogo from "@/assets/logo/showroom-logo.png";
 
 const DISPLAY_NAME_FALLBACK = "Fritzy Rosmerian";
 const IDN_USERNAME          = "jkt48_fritzy";
-const FOLLOWERS_FALLBACK    = "—";
-const FOLLOWING_FALLBACK    = "—";
+const FOLLOWERS_FALLBACK    = "-";
+const FOLLOWING_FALLBACK    = "-";
 
 const SHOWROOM_KEY          = "JKT48_Fritzy";
 const SHOWROOM_ROOM_ID      = 510011;
-const SR_FOLLOWERS_FALLBACK = "—";
-const SR_LEVEL_FALLBACK     = "—";
+const SR_FOLLOWERS_FALLBACK = "-";
+const SR_LEVEL_FALLBACK     = "-";
 
 type ProfileStats = {
   display_name: string;
